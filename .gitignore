@@ -7,3 +7,4 @@ examples/*splindex
 htmlcov/
 dist/
 build/
+docs/_build/

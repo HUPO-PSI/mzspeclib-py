@@ -22,7 +22,7 @@ test = [
 ]
 docs = [
     "sphinx",
-    "pydata-sphinx-theme",
+    "sphinx-rtd-theme",
     "numpydoc>=1,<2",
     "sphinx_click",
     "myst-parser",

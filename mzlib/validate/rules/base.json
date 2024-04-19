@@ -112,7 +112,7 @@
       ],
       "combination_logic": "OR",
       "id": "Spectrum_has_precursor_mz",
-      "level": "SHOULD",
+      "level": "MAY",
       "path": "/Library/Spectrum"
     },
     {

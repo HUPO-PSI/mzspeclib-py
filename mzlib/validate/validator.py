@@ -2,6 +2,8 @@ import itertools
 import logging
 import warnings
 import re
+import numbers
+
 from dataclasses import dataclass, field
 from typing import Any, Callable, Deque, Dict, Iterator, List, Optional, Sequence, Tuple, Union
 
@@ -78,7 +80,11 @@ def _warning_iterator(iterator: Iterator[Spectrum]) -> Iterator[Spectrum]:
 
 def _is_of_type(attrib, relation) -> bool:
     if isinstance(relation.value_type.type_definition, type):
-        return isinstance(attrib.value, relation.value_type.type_definition)
+        if relation.value_type.type_definition is float:
+            tp = numbers.Number
+        else:
+            tp = relation.value_type.type_definition
+        return isinstance(attrib.value, tp)
     else:
         return _try_convert(attrib.value, relation.value_type.type_definition)
 

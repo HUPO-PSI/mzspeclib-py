@@ -36,6 +36,7 @@ def rule_to_table_rows(rule: dict):
             row["attribute_name"] = attr["name"]
             row["attribute_accession"] = attr["accession"]
             row["allow_children"] = attr.get("allow_children")
+            row['repeatable'] = attr.get('repeatable', False)
             term = cv[attr["accession"]]
             row["description"] = term.definition
             units = ";".join([f"{rel.accession}|{rel.comment}" for rel in term.get("has_units", [])])

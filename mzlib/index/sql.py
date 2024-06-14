@@ -17,7 +17,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker, scoped_session
 
-from .base import IndexBase
+from .base import IndexBase, IndexInitializedRecord
 
 
 logger = logging.getLogger(__name__)
@@ -61,6 +61,18 @@ class ClusterSpectrumLibraryIndexRecord(Base):
 
 
 class SQLIndex(IndexBase):
+    """
+    An on-disk data structure for holding spectrum metadata and offsets.
+
+    This uses a SQLite3 database with the file extension ``.splindex`` to
+    hold information.
+
+    Attributes
+    ----------
+    session : :class:`~.sqlalchemy.orm.scoped_session`
+        A thread-aware database session manager
+    """
+
     extension = '.splindex'
 
     filename: str
@@ -82,7 +94,7 @@ class SQLIndex(IndexBase):
         # File was empty
         if len(inst) == 0 and exists:
             exists = False
-        return inst, exists
+        return IndexInitializedRecord(inst, exists)
 
     @classmethod
     def exists(cls, filename: Union[str, pathlib.Path, io.FileIO]):

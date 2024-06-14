@@ -29,6 +29,22 @@ class SpectrumAggregation(_AttributeProxy):
 
 
 class Spectrum(AttributeManager):
+    """
+    A mass spectrum stored in a spectral library.
+
+    The :class:`Spectrum` type is a :class:`~.AttributeManager`, interacting
+    with the spectrum's attribute list itself. It also encloses :class:`~.Interpretation`
+    and :class:`~.Analyte` members which have their own attributes.
+
+    Attributes
+    ----------
+    peak_list : List[Tuple[float, float, Optional[List[:class:`mzpaf.PeakAnnotation`]], Optional[List[Any]]]]
+        The list of peaks which may or may not be annotated and may or may not have
+        aggregation metrics.
+    interpretations : :class:`~.InterpretationCollection`
+        The set of all interpretations associated with this spectrum, and their analytes.
+    """
+
     peak_list: List
     analytes: Dict[str, Analyte]
     interpretations: InterpretationCollection
@@ -80,6 +96,7 @@ class Spectrum(AttributeManager):
 
     @property
     def precursor_charge(self) -> int:
+        """Obtain the spectrum's precursor ion charge or analyte charge"""
         if self._precursor_charge:
             self._precursor_charge
         for analyte in self.analytes.values():
@@ -87,12 +104,15 @@ class Spectrum(AttributeManager):
                 return analyte.charge
 
     def add_analyte(self, analyte: Analyte):
+        """Add an :class:`~.Analyte` to the spectrum"""
         self.analytes[str(analyte.id)] = analyte
 
     def get_analyte(self, analyte_id: str) -> Analyte:
+        """Get an :class:`~.Analyte` by ID from the spectrum"""
         return self.analytes[str(analyte_id)]
 
     def remove_analyte(self, analyte_id: str):
+        """Remove an :class:`~.Analyte` by ID from the spectrum"""
         analyte_id = str(analyte_id)
         del self.analytes[analyte_id]
         interpretation: Interpretation

@@ -3,7 +3,24 @@ import io
 import pathlib
 import warnings
 
-from typing import Collection, Iterator, Optional, Tuple, Union, Any, List
+from typing import Collection, Iterator, Optional, Tuple, Union, Any, List, NamedTuple
+
+
+class IndexInitializedRecord(NamedTuple):
+    """
+    An instantiated index object, and whether it was initialized already or the caller
+    needs to populate it.
+
+    Attributes
+    ----------
+    index : :class:`~.IndexBase`
+        A newly index object
+    initialized : :class:`bool`
+        Whether the index was populated or not
+    """
+
+    index: 'IndexBase'
+    initialized: bool
 
 
 class IndexRecordBase:
@@ -39,7 +56,7 @@ class IndexBase(Collection):
     """
 
     @classmethod
-    def from_filename(cls, filename: Union[str, pathlib.Path, io.FileIO], library=None) -> Tuple["IndexBase", bool]:
+    def from_filename(cls, filename: Union[str, pathlib.Path, io.FileIO], library=None) -> IndexInitializedRecord:
         """
         Get a file path for an index file, given the library filename.
 

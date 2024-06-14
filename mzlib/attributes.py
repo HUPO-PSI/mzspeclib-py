@@ -16,7 +16,7 @@ class Attribute(object):
     key: str
     value: Union[str, int, float, 'Attribute', List]
     group_id: Optional[str]
-    owner_id: int
+    owner_id: Any
 
     def __init__(self, key, value, group_id=None, owner_id=-1):
         self.key = key
@@ -77,7 +77,8 @@ class Attribute(object):
 
 class AttributeManager(object):
     """
-    A key-value pair store with optional attribute grouping
+    A key-value pair store with optional grouping for storing controlled
+    vocabulary-backed attributes.
 
     Attributes
     ----------
@@ -450,6 +451,13 @@ class AttributeManager(object):
 
 
 class IdentifiedAttributeManager(AttributeManager):
+    """
+    An :class:`AttributeManager` with an :attr:`id` attribute.
+
+    This serves as the base type for most intermediate layers in
+    :title-reference:`mzSpecLib`.
+    """
+
     __slots__ = ('id', )
 
     id: str
@@ -469,6 +477,13 @@ class IdentifiedAttributeManager(AttributeManager):
 
 
 class _ReadAttributes(object):
+    """
+    A mixin type that provides read access to controlled vocabulary-backed attributes.
+
+    Assumes that the implementation class will provide an :attr:`attributes` attribute
+    that is an instance of :class:`AttributeManager`, or at least :class:`Attributed`.
+    """
+
     __slots__ = ()
 
     attributes: AttributeManager
@@ -541,6 +556,13 @@ class _ReadAttributes(object):
 
 
 class _WriteAttributes(object):
+    """
+    A mixin type that provides write access to controlled vocabulary-backed attributes.
+
+    Assumes that the implementation class will provide an :attr:`attributes` attribute
+    that is an instance of :class:`AttributeManager`, or at least :class:`Attributed`.
+    """
+
     __slots__ = ()
 
     attributes: AttributeManager
@@ -614,6 +636,19 @@ Attributed = Union[AttributeManager, AttributedEntity]
 
 
 class AttributeManagedProperty(Generic[T]):
+    """
+    A :class:`property`-like object that stores its value as a controlled vocabulary backed
+    attribute on an :class:`Attributed`-like object.
+
+    Attributes
+    ----------
+    attribute : str
+        The attribute which is used to read/write the value of the descriptor.
+    multiple : bool
+        Whether the default assumption is that the attribute will be repeated.
+        When :const:`True`, a :class:`list` is always returned.
+    """
+
     __slots__ = ("attribute", "multiple")
     attribute: str
     multiple: bool
@@ -651,6 +686,16 @@ class AttributeManagedProperty(Generic[T]):
 
 
 class AttributeListManagedProperty(Generic[T]):
+    """
+    Like :class:`AttributeManagedProperty`, except a list of attributes
+    are tried in succession until one is found.
+
+    Attributes
+    ----------
+    attributes : list[str]
+        The attributes to probe, in order
+    """
+
     __slots__ = ("attributes", )
     attributes: List[str]
 
@@ -693,6 +738,14 @@ class AttributeListManagedProperty(Generic[T]):
 
 
 class AttributeProxyMeta(type):
+    """
+    A metaclass that manages controlled vocabulary-backed properties
+    like :class:`AttributeManagedProperty` or :class:`AttributeListManagedProperty`.
+
+    This includes generating a meaningful :meth:`__repr__` method for the instance
+    types.
+    """
+
     def __new__(cls, typename, bases, namespace):
         props = {}
         for k, v in namespace.items():
@@ -720,6 +773,12 @@ class AttributeProxyMeta(type):
 
 
 class ROAttributeProxy(_ReadAttributes, metaclass=AttributeProxyMeta):
+    """
+    A read-only attribute proxy wraps another :class:`Attributed`-like
+    object and provides tailored interactions with all or a subset
+    of those attributes.
+    """
+
     attributes: Attributed
 
     def __init__(self, attributes):

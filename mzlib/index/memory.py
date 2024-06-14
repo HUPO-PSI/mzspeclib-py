@@ -8,7 +8,7 @@ from collections import defaultdict
 
 from mzlib.index.base import IndexRecordBase
 
-from .base import IndexBase, IndexRecordBase
+from .base import IndexBase, IndexRecordBase, IndexInitializedRecord
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -152,6 +152,19 @@ class ClusterIndexRecord(IndexRecordBase, _IndexAttr):
 
 
 class MemoryIndex(IndexBase):
+    """
+    An in-memory data structure for holding spectrum metadata and offsets.
+
+    Attributes
+    ----------
+    records : List[:class:`IndexRecord`]
+        The index entries for spectra
+    cluster_records : List[:class:`ClusterIndexRecord`]
+        The index entries for clusters
+    metadata : Dict[str, Any]
+        Arbitrary metadata about the library or the index
+    """
+
     records: List[IndexRecord]
     cluster_records: List[ClusterIndexRecord]
     metadata: Dict[str, Any]
@@ -165,7 +178,7 @@ class MemoryIndex(IndexBase):
     @classmethod
     def from_filename(cls, filename, library=None):
         inst = cls()
-        return inst, False
+        return IndexInitializedRecord(inst, False)
 
     def __init__(self, records=None, cluster_records=None, metadata=None):
         self.records = list(records or [])

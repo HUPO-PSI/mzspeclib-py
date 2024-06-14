@@ -436,7 +436,7 @@
     },
     {
       "id": "has_spectrum_cluster_key",
-      "path": "/Library",
+      "path": "/Library/Cluster",
       "attr": [
         {
           "accession": "MS:1003267",
@@ -452,7 +452,7 @@
     },
     {
       "id": "has_spectrum_cluster_member_spectrum_keys",
-      "path": "/Library",
+      "path": "/Library/Cluster",
       "attr": [
         {
           "accession": "MS:1003268",
@@ -464,7 +464,7 @@
     },
     {
       "id": "has_spectrum_cluster_member_usi",
-      "path": "/Library",
+      "path": "/Library/Cluster",
       "attr": [
         {
           "accession": "MS:1003269",
@@ -508,7 +508,7 @@
           }
         }
       ],
-      "requirement_level": "MUST"
+      "requirement_level": "MAY"
     },
     {
       "id": "has_library_spectrum_name",
@@ -733,7 +733,7 @@
           }
         }
       ],
-      "requirement_level": "MUST"
+      "requirement_level": "SHOULD"
     },
     {
       "id": "has_isolation_window_target_m/z",
@@ -757,7 +757,7 @@
       "attr": [
         {
           "accession": "MS:1000828",
-          "name": "Isolation window lower offset",
+          "name": "isolation window lower offset",
           "repeatable": false,
           "value": {
             "name": "value_of_type",
@@ -773,7 +773,7 @@
       "attr": [
         {
           "accession": "MS:1000829",
-          "name": "Isolation window upper offset",
+          "name": "isolation window upper offset",
           "repeatable": false,
           "value": {
             "name": "value_of_type",
@@ -1136,7 +1136,7 @@
           }
         }
       ],
-      "requirement_level": "MAY"
+      "requirement_level": "SHOULD"
     },
     {
       "id": "has_data_processing_action",

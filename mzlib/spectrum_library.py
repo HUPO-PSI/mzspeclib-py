@@ -137,6 +137,12 @@ class SpectrumLibrary:
     #### Define getter/setter for attribute identifier
     @property
     def identifier(self) -> Optional[str]:
+        """
+        The spectrum library's identifier, such an accession number provided by a host or repository.
+
+        This attribute may not exist for libraries loaded from files on disk. It relies on the presence
+        of the ``MS:1003187|library identifier`` attribute in the library header.
+        """
         if self._identifier is None:
             if self._backend_initialized():
                 return self.backend.identifier
@@ -151,6 +157,11 @@ class SpectrumLibrary:
     #### Define getter/setter for attribute filename
     @property
     def filename(self) -> Optional[str]:
+        """
+        The path to the library file on disk.
+
+        This may also be a file-like object.
+        """
         return self._filename
 
     @filename.setter

@@ -10,10 +10,10 @@ from typing import List, Tuple, Dict, Iterator, Any, Union
 
 from pyteomics import proforma
 
-from mzlib import annotation
-from mzlib.backends.base import DEFAULT_VERSION, FORMAT_VERSION_TERM, LIBRARY_NAME_TERM, _CSVSpectralLibraryBackendBase
-from mzlib.backends.utils import open_stream, urlify
-from mzlib.spectrum import Spectrum, SPECTRUM_NAME
+from mzspeclib import annotation
+from mzspeclib.backends.base import DEFAULT_VERSION, FORMAT_VERSION_TERM, LIBRARY_NAME_TERM, _CSVSpectralLibraryBackendBase
+from mzspeclib.backends.utils import open_stream, urlify
+from mzspeclib.spectrum import Spectrum, SPECTRUM_NAME
 
 
 def _rewrite_unimod_peptide_as_proforma(sequence: str) -> str:

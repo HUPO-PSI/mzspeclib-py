@@ -7,14 +7,14 @@ import csv
 
 from typing import DefaultDict, List
 
-from mzlib.spectrum_library import SpectrumLibrary
-from mzlib.index import MemoryIndex, SQLIndex
-from mzlib.backends.base import FormatInferenceFailure, SpectralLibraryBackendBase
-from mzlib.validate import validator
-from mzlib.validate.level import RequirementLevel
-from mzlib.ontology import ControlledVocabularyResolver
+from mzspeclib.spectrum_library import SpectrumLibrary
+from mzspeclib.index import MemoryIndex, SQLIndex
+from mzspeclib.backends.base import FormatInferenceFailure, SpectralLibraryBackendBase
+from mzspeclib.validate import validator
+from mzspeclib.validate.level import RequirementLevel
+from mzspeclib.ontology import ControlledVocabularyResolver
 
-from mzlib.tools.utils import ColoringFormatter
+from mzspeclib.tools.utils import ColoringFormatter
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 

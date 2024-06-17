@@ -4,8 +4,8 @@ matplotlib.use("agg")
 
 from matplotlib import pyplot as plt
 
-from mzlib.spectrum_library import SpectrumLibrary
-from mzlib.draw import draw_spectrum
+from mzspeclib.spectrum_library import SpectrumLibrary
+from mzspeclib.draw import draw_spectrum
 
 
 def main(path, spectrum_key):

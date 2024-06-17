@@ -1,5 +1,5 @@
 test:
-	pytest -r a -v tests --cov mzlib --cov-report=html --cov-report term
+	pytest -r a -v tests --cov mzspeclib --cov-report=html --cov-report term
 
 retest:
 	py.test -v tests --lf --pdb

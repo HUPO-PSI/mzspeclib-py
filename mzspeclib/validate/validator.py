@@ -9,19 +9,19 @@ from typing import Any, Callable, Deque, Dict, Iterator, List, Optional, Sequenc
 
 from psims.controlled_vocabulary.entity import Entity, ListOfType
 
-from mzlib.attributes import Attribute, Attributed
+from mzspeclib.attributes import Attribute, Attributed
 
-from mzlib.spectrum import Spectrum
-from mzlib.analyte import Analyte, Interpretation
-from mzlib.spectrum_library import SpectrumLibrary
+from mzspeclib.spectrum import Spectrum
+from mzspeclib.analyte import Analyte, Interpretation
+from mzspeclib.spectrum_library import SpectrumLibrary
 
-from mzlib.ontology import _VocabularyResolverMixin
+from mzspeclib.ontology import _VocabularyResolverMixin
 
 
-from mzlib.validate.level import RequirementLevel
-from mzlib.validate.semantic_rule import ScopedSemanticRule, load_rule_set
-from mzlib.validate.object_rule import ScopedObjectRuleBase, SpectrumPeakAnnotationRule, ValidationWarning
-from mzlib.defaults import DEFAULT_UNITS
+from mzspeclib.validate.level import RequirementLevel
+from mzspeclib.validate.semantic_rule import ScopedSemanticRule, load_rule_set
+from mzspeclib.validate.object_rule import ScopedObjectRuleBase, SpectrumPeakAnnotationRule, ValidationWarning
+from mzspeclib.defaults import DEFAULT_UNITS
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())

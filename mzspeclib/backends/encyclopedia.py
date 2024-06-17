@@ -13,14 +13,14 @@ import numpy as np
 
 from pyteomics import proforma
 
-from mzlib import annotation
-from mzlib.analyte import FIRST_ANALYTE_KEY, FIRST_INTERPRETATION_KEY, Analyte, ProteinDescription
-from mzlib.spectrum import Spectrum, SPECTRUM_NAME, CHARGE_STATE
-from mzlib.attributes import AttributeManager, Attributed, Attribute
+from mzspeclib import annotation
+from mzspeclib.analyte import FIRST_ANALYTE_KEY, FIRST_INTERPRETATION_KEY, Analyte, ProteinDescription
+from mzspeclib.spectrum import Spectrum, SPECTRUM_NAME, CHARGE_STATE
+from mzspeclib.attributes import AttributeManager, Attributed, Attribute
 
-from mzlib.backends.base import SpectralLibraryBackendBase, FORMAT_VERSION_TERM, DEFAULT_VERSION
+from mzspeclib.backends.base import SpectralLibraryBackendBase, FORMAT_VERSION_TERM, DEFAULT_VERSION
 
-from mzlib.index.base import IndexBase
+from mzspeclib.index.base import IndexBase
 
 
 DECOY_SPECTRUM = "MS:1003192|decoy spectrum"

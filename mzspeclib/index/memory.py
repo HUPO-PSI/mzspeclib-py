@@ -6,7 +6,7 @@ from typing import Any, Dict, Iterator, Optional, List, DefaultDict, Union
 from numbers import Integral
 from collections import defaultdict
 
-from mzlib.index.base import IndexRecordBase
+from mzspeclib.index.base import IndexRecordBase
 
 from .base import IndexBase, IndexRecordBase, IndexInitializedRecord
 

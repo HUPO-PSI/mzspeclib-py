@@ -11,12 +11,12 @@ from dataclasses import dataclass
 from collections import deque
 from typing import ClassVar, List, Optional, Tuple, Union, Iterable
 
-from mzlib.annotation import parse_annotation
-from mzlib.spectrum import Spectrum
-from mzlib.cluster import SpectrumCluster
-from mzlib.attributes import Attribute, AttributeManager, Attributed, AttributeSet
-from mzlib.analyte import Analyte, Interpretation, InterpretationMember
-from mzlib.validate.object_rule import ValidationWarning
+from mzspeclib.annotation import parse_annotation
+from mzspeclib.spectrum import Spectrum
+from mzspeclib.cluster import SpectrumCluster
+from mzspeclib.attributes import Attribute, AttributeManager, Attributed, AttributeSet
+from mzspeclib.analyte import Analyte, Interpretation, InterpretationMember
+from mzspeclib.validate.object_rule import ValidationWarning
 
 from .base import (
     SpectralLibraryBackendBase,

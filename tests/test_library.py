@@ -2,7 +2,7 @@ import os
 import unittest
 import tempfile
 
-from mzlib.spectrum_library import SpectrumLibrary
+from mzspeclib.spectrum_library import SpectrumLibrary
 
 from .common import datafile
 from .test_library_backend import LibraryBehaviorBase

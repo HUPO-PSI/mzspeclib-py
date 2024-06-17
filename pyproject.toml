@@ -1,5 +1,5 @@
 [project]
-name='mzlib'
+name='mzspeclib'
 version='0.1.0-alpha'
 description='HUPO-PSI Spectral library format'
 classifiers=[
@@ -30,7 +30,7 @@ docs = [
 ]
 
 [project.scripts]
-mzspeclib = "mzlib.tools.cli:main"
+mzspeclib = "mzspeclib.tools.cli:main"
 
 [build-system]
 requires = ["setuptools"]

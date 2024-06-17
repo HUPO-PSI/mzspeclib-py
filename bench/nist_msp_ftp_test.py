@@ -5,8 +5,8 @@ import pprint
 
 from urllib.request import urlopen
 
-from mzlib.backends import msp
-from mzlib import annotation
+from mzspeclib.backends import msp
+from mzspeclib import annotation
 
 
 urls = [

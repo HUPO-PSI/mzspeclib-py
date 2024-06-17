@@ -1,7 +1,7 @@
 import unittest
 
-from mzlib.spectrum_library import SpectrumLibrary
-from mzlib.validate import validator
+from mzspeclib.spectrum_library import SpectrumLibrary
+from mzspeclib.validate import validator
 
 from .common import datafile
 

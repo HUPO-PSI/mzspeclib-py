@@ -1,7 +1,7 @@
 import os
 
-from mzlib import SpectrumLibrary
-from mzlib import annotation
+from mzspeclib import SpectrumLibrary
+from mzspeclib import annotation
 
 workspace = os.path.dirname(__file__)
 

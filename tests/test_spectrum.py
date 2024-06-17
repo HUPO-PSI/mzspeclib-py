@@ -2,7 +2,7 @@ import os
 import unittest
 import tempfile
 
-from mzlib.backends import MSPSpectralLibrary, TextSpectralLibrary
+from mzspeclib.backends import MSPSpectralLibrary, TextSpectralLibrary
 
 from .common import datafile
 

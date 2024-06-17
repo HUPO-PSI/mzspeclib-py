@@ -11,9 +11,9 @@ from xml.etree import ElementTree as etree
 
 from typing import Any, ClassVar, Dict, List, TYPE_CHECKING, Mapping, Optional, Sequence, Set, Tuple, Union
 
-from mzlib.attributes import Attributed
-from mzlib.utils import flatten, ensure_iter
-from mzlib.ontology import _VocabularyResolverMixin
+from mzspeclib.attributes import Attributed
+from mzspeclib.utils import flatten, ensure_iter
+from mzspeclib.ontology import _VocabularyResolverMixin
 
 from .level import RequirementLevel, CombinationLogic
 

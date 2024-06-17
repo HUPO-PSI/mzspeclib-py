@@ -7,7 +7,7 @@ from typing import Iterator, List, Union
 
 from sqlalchemy import Column, ForeignKey, Integer, Float, String, DateTime, Text, LargeBinary
 
-from mzlib.index.base import IndexRecordBase
+from mzspeclib.index.base import IndexRecordBase
 try: # For SQLAlchemy 2.0
     from sqlalchemy.orm import declarative_base
 except ImportError:

@@ -7,11 +7,11 @@ from typing import List, Tuple, Dict, Iterator, Any, Deque, Union
 
 from pyteomics import proforma
 
-from mzlib import annotation
-from mzlib.analyte import Analyte
-from mzlib.backends.base import LIBRARY_NAME_TERM, _CSVSpectralLibraryBackendBase, FORMAT_VERSION_TERM, DEFAULT_VERSION
-from mzlib.backends.utils import open_stream, urlify
-from mzlib.spectrum import Spectrum, SPECTRUM_NAME
+from mzspeclib import annotation
+from mzspeclib.analyte import Analyte
+from mzspeclib.backends.base import LIBRARY_NAME_TERM, _CSVSpectralLibraryBackendBase, FORMAT_VERSION_TERM, DEFAULT_VERSION
+from mzspeclib.backends.utils import open_stream, urlify
+from mzspeclib.spectrum import Spectrum, SPECTRUM_NAME
 
 
 CHARGE_STATE = "MS:1000041|charge state"

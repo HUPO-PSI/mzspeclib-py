@@ -12,13 +12,13 @@ from pathlib import Path
 from psims.controlled_vocabulary import Entity
 from psims.controlled_vocabulary.controlled_vocabulary import (
     load_uo, load_unimod, load_psims)
-from mzlib.cluster import SpectrumCluster
+from mzspeclib.cluster import SpectrumCluster
 
-from mzlib.index import MemoryIndex, SQLIndex, IndexBase
-from mzlib.spectrum import LIBRARY_SPECTRUM_INDEX, LIBRARY_SPECTRUM_KEY, Spectrum
-from mzlib.analyte import Analyte, Interpretation, InterpretationMember, ANALYTE_MIXTURE_TERM
-from mzlib.attributes import Attributed, AttributedEntity, AttributeSet, AttributeManagedProperty
-from mzlib.ontology import _VocabularyResolverMixin
+from mzspeclib.index import MemoryIndex, SQLIndex, IndexBase
+from mzspeclib.spectrum import LIBRARY_SPECTRUM_INDEX, LIBRARY_SPECTRUM_KEY, Spectrum
+from mzspeclib.analyte import Analyte, Interpretation, InterpretationMember, ANALYTE_MIXTURE_TERM
+from mzspeclib.attributes import Attributed, AttributedEntity, AttributeSet, AttributeManagedProperty
+from mzspeclib.ontology import _VocabularyResolverMixin
 
 from .utils import open_stream, _LineBuffer
 

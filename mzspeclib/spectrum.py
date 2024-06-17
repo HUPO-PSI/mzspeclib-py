@@ -4,14 +4,14 @@ import textwrap
 
 from typing import Any, Dict,  List, Optional, TYPE_CHECKING
 
-from mzlib.attributes import (
+from mzspeclib.attributes import (
     AttributeManager, AttributeManagedProperty, AttributeListManagedProperty,
     AttributeProxy as _AttributeProxy, AttributeFacet
 )
-from mzlib.analyte import Analyte, InterpretationCollection, Interpretation
+from mzspeclib.analyte import Analyte, InterpretationCollection, Interpretation
 
 if TYPE_CHECKING:
-    from mzlib.spectrum_library import SpectrumLibrary
+    from mzspeclib.spectrum_library import SpectrumLibrary
 
 #A class that holds data for each spectrum that is read from the SpectralLibrary class
 
@@ -171,7 +171,7 @@ class Spectrum(AttributeManager):
 
         #### If the format is text
         if format == "text":
-            from mzlib.backends.text import format_spectrum
+            from mzspeclib.backends.text import format_spectrum
             return format_spectrum(self, **kwargs)
 
         #### If the format is TSV
@@ -239,7 +239,7 @@ class Spectrum(AttributeManager):
 
         #### If the format is JSON
         elif format == "json":
-            from mzlib.backends.json import format_spectrum
+            from mzspeclib.backends.json import format_spectrum
             return format_spectrum(self, **kwargs)
 
         #### Otherwise we don't know this format

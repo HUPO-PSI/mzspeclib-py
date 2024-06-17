@@ -3,12 +3,12 @@ import re
 
 from typing import Dict, Tuple
 
-from mzlib.attributes import AttributeManager
+from mzspeclib.attributes import AttributeManager
 
-from mzlib.annotation import AnnotationStringParser
+from mzspeclib.annotation import AnnotationStringParser
 
-from mzlib.backends.base import DEFAULT_VERSION, FORMAT_VERSION_TERM, LIBRARY_NAME_TERM
-from mzlib.backends.utils import open_stream
+from mzspeclib.backends.base import DEFAULT_VERSION, FORMAT_VERSION_TERM, LIBRARY_NAME_TERM
+from mzspeclib.backends.utils import open_stream
 
 from .msp import MSPSpectralLibrary as _MSPSpectralLibrary
 from .utils import CaseInsensitiveDict

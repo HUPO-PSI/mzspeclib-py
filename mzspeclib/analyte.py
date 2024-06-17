@@ -4,7 +4,7 @@ from typing import Iterable, KeysView, ItemsView, Optional, ValuesView, Dict, Mu
 
 from pyteomics import proforma
 
-from mzlib.attributes import AttributedEntity, IdentifiedAttributeManager, AttributeManagedProperty, AttributeProxy, AttributeGroupFacet
+from mzspeclib.attributes import AttributedEntity, IdentifiedAttributeManager, AttributeManagedProperty, AttributeProxy, AttributeGroupFacet
 
 
 FIRST_ANALYTE_KEY = '1'

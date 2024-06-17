@@ -5,6 +5,7 @@ There are an uncountable number of dialects of MSP. This library attempts to
 cover a representative subset from the NIST and some found in the wild. If you
 encounter an MSP file that does not parse properly, please report it.
 """
+from dataclasses import dataclass, field
 import re
 import io
 import os
@@ -12,18 +13,21 @@ import logging
 import itertools
 import warnings
 
+from fractions import Fraction
+
 from typing import (
     Any, Callable, Collection,
     Dict, List, Mapping, Optional,
-    Set, Tuple, Iterable, DefaultDict)
+    Set, Tuple, Iterable, DefaultDict,
+    NamedTuple)
 
 from pyteomics import proforma
 
-from mzlib import annotation
+from mzspeclib import annotation
 
-from mzlib.analyte import FIRST_ANALYTE_KEY, FIRST_INTERPRETATION_KEY, Analyte, Interpretation, ProteinDescription
-from mzlib.spectrum import Spectrum, SPECTRUM_NAME
-from mzlib.attributes import AttributeManager, AttributeSet, Attributed
+from mzspeclib.analyte import FIRST_ANALYTE_KEY, FIRST_INTERPRETATION_KEY, Analyte, Interpretation, ProteinDescription
+from mzspeclib.spectrum import Spectrum, SPECTRUM_NAME
+from mzspeclib.attributes import Attribute, AttributeManager, AttributeSet, Attributed
 
 from .base import (
     DEFAULT_VERSION, FORMAT_VERSION_TERM, _PlainTextSpectralLibraryBackendBase,
@@ -56,14 +60,22 @@ def _generate_numpeaks_keys():
 
 NUM_PEAKS_KEYS = _generate_numpeaks_keys()
 
-leader_terms_pattern = re.compile(r"(Name|NAME|Compound|COMPOUND)\s*:")
-leader_terms_line_pattern = re.compile(r'(?:Name|NAME|Compound|COMPOUND)\s*:\s+(.+)')
+LEADER_TERMS_PATTERN = re.compile(r"(Name|NAME|Compound|COMPOUND)\s*:")
+LEADER_TERMS_LINE_PATTERN = re.compile(r'(?:Name|NAME|Compound|COMPOUND)\s*:\s+(.+)')
+
+SPACE_SPLITTER = re.compile(r"\s+")
 
 STRIPPED_PEPTIDE_TERM = "MS:1000888|stripped peptide sequence"
 PEPTIDE_MODIFICATION_TERM = "MS:1001471|peptide modification details"
 
 PEAK_OBSERVATION_FREQ = "MS:1003279|observation frequency of peak"
 PEAK_ATTRIB = "MS:1003254|peak attribute"
+
+
+RawPeakLine = Tuple[float, float, str, str]
+PeakLine = Tuple[float, float, List[annotation.IonAnnotationBase], List[Any]]
+
+PeakAggregateParseFn = Callable[[str], Any]
 
 
 class AttributeHandler:
@@ -296,8 +308,8 @@ analyte_terms = CaseInsensitiveDict(
         "MC": "MS:1003044|number of missed cleavages",
         "Mods": PEPTIDE_MODIFICATION_TERM,
         "Naa": "MS:1003043|number of residues",
+        "Parent": "MS:1000744|selected ion m/z",
         "PrecursorMonoisoMZ": "MS:1003208|experimental precursor monoisotopic m/z",
-        "Parent": "MS:1003208|experimental precursor monoisotopic m/z",
         "ObservedPrecursorMZ": "MS:1003208|experimental precursor monoisotopic m/z",
         "PrecursorMZ": "MS:1003208|experimental precursor monoisotopic m/z",
         "PRECURSORMZ": "MS:1003208|experimental precursor monoisotopic m/z",
@@ -355,6 +367,7 @@ def unassigned_peaks_handler(key: str, value: str, container: Attributed) -> boo
                 is_top_20 = True
             value = value.split("/")[0]
         value = int(value)
+    assert isinstance(value, int)
     if is_top_20:
         container.add_attribute("MS:1003290|number of unassigned peaks among top 20 peaks", value)
     else:
@@ -362,20 +375,19 @@ def unassigned_peaks_handler(key: str, value: str, container: Attributed) -> boo
     return True
 
 
-interpretation_terms = CaseInsensitiveDict({
-    "Unassigned_all_20ppm": "MS:1003079|total unassigned intensity fraction",
-    "Unassign_all": "MS:1003079|total unassigned intensity fraction",
-
-    "top_20_num_unassigned_peaks_20ppm": "MS:1003290|number of unassigned peaks among top 20 peaks",
-    "num_unassigned_peaks_20ppm": unassigned_peaks_handler,
-    "num_unassigned_peaks": unassigned_peaks_handler,
-
-    "max_unassigned_ab_20ppm": "MS:1003289|intensity of highest unassigned peak",
-    "max_unassigned_ab": "MS:1003289|intensity of highest unassigned peak",
-
-    "Unassigned_20ppm": "MS:1003080|top 20 peak unassigned intensity fraction",
-    "Unassigned": "MS:1003080|top 20 peak unassigned intensity fraction",
-})
+interpretation_terms = CaseInsensitiveDict(
+    {
+        "Unassigned_all_20ppm": "MS:1003079|total unassigned intensity fraction",
+        "Unassign_all": "MS:1003079|total unassigned intensity fraction",
+        "top_20_num_unassigned_peaks_20ppm": unassigned_peaks_handler,
+        "num_unassigned_peaks_20ppm": unassigned_peaks_handler,
+        "num_unassigned_peaks": unassigned_peaks_handler,
+        "max_unassigned_ab_20ppm": "MS:1003289|intensity of highest unassigned peak",
+        "max_unassigned_ab": "MS:1003289|intensity of highest unassigned peak",
+        "Unassigned_20ppm": "MS:1003080|top 20 peak unassigned intensity fraction",
+        "Unassigned": "MS:1003080|top 20 peak unassigned intensity fraction",
+    }
+)
 
 
 interpretation_member_terms = CaseInsensitiveDict({
@@ -879,6 +891,111 @@ protein_attributes_to_group = [
 ]
 
 
+def proportion_parser(aggregation: str) -> float:
+    """Parse for fractions or percentages"""
+    if '/' in aggregation:
+        aggregation: Fraction = Fraction(aggregation)
+        return float(aggregation)
+    else:
+        return float(aggregation)
+
+
+@dataclass
+class PeakAggregationParser:
+    """
+    Parse peak aggregation information.
+
+    Subtypes may produce different attributes.
+
+    Attributes
+    ----------
+    peak_attributes : list[:class:`~.Attribute`]
+        The attributes this parser expects
+    """
+
+    peak_attributes: List[Tuple[Attribute, PeakAggregateParseFn]] = field(default_factory=lambda: [Attribute(PEAK_ATTRIB, PEAK_OBSERVATION_FREQ)])
+
+    def __call__(self, aggregation: str, wrap_errors: bool=True, **kwargs) -> List[Tuple[Attribute, float]]:
+        parsed = []
+        for i, (k, parser), token in enumerate(SPACE_SPLITTER.split(aggregation)):
+            try:
+                result = parser(token)
+                parsed.append((k, result))
+            except Exception as err:
+                if not wrap_errors:
+                    raise err from None
+                else:
+                    logger.error(f"Failed to parse aggregation at {i}")
+                    parsed.append((k, token))
+
+
+@dataclass
+class PeakParsingStrategy:
+    """
+    A combination of peak annotation parsing and peak aggregation parsing
+    strategies.
+
+    Attributes
+    ----------
+    annotation_parser : :class:`MSPAnnotationStringParser`
+        The peak annotation parser
+    """
+
+    annotation_parser: Optional[MSPAnnotationStringParser] = None
+    aggregation_parser: Optional[PeakAggregationParser] = None
+
+    def has_aggregation(self) -> bool:
+        return self.aggregation_parser is not None
+
+    def has_annotation(self) -> bool:
+        return self.annotation_parser is not None
+
+    def parse_aggregation(self, aggregation: str, wrap_errors: bool=True, **kwargs):
+        return self.aggregation_parser(aggregation=aggregation, wrap_errors=wrap_errors, **kwargs)
+
+    def parse_annotation(self, annotation: str, wrap_errors: bool=True, **kwargs):
+        return self.annotation_parser(annotation_string=annotation, wrap_errors=wrap_errors, **kwargs)
+
+    def parse_peak_annotations(self, peal_list: List[RawPeakLine]):
+        pass
+
+    def parse_peak_list(self, peak_lines: List[str]) -> List[RawPeakLine]:
+        peak_list = []
+        for values in peak_lines:
+            interpretations = ""
+            aggregation = ""
+            if len(values) == 1:
+                mz = values
+                intensity = "1"
+            if len(values) == 2:
+                mz, intensity = values
+            elif len(values) == 3:
+                mz, intensity, interpretations = values
+            elif len(values) > 3:
+                mz, intensity, interpretations = values[0:2]
+            else:
+                mz = "1"
+                intensity = "1"
+
+            interpretations = interpretations.strip('"')
+            aggregation = None
+            if interpretations.startswith("?"):
+                parts = SPACE_SPLITTER.split(interpretations)
+                if len(parts) > 1:
+                    # Some msp files have a concept for ?i, but this requires a definition
+                    interpretations = "?"
+                    aggregation = parts[1:]
+            else:
+                if " " in interpretations:
+                    parts = SPACE_SPLITTER.split(interpretations)
+                    interpretations = parts[0]
+                    aggregation = parts[1:]
+
+            #### Add to the peak list
+            peak_list.append([float(mz), float(intensity), interpretations, aggregation])
+        return peak_list
+
+
 class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
     """
     A reader for the plain text NIST MSP spectral library format.
@@ -917,7 +1034,7 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
     def guess_from_header(cls, filename: str) -> bool:
         with open_stream(filename, 'r') as stream:
             first_line = stream.readline()
-            if leader_terms_pattern.match(first_line):
+            if LEADER_TERMS_PATTERN.match(first_line):
                 return True
         return False
 
@@ -947,7 +1064,7 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
             attributes.add_attribute(LIBRARY_NAME_TERM, stream.name.rsplit('.msp', 1)[0].split(os.sep)[-1])
         self.attributes.clear()
         self.attributes._from_iterable(attributes)
-        if leader_terms_pattern.match(first_line):
+        if LEADER_TERMS_PATTERN.match(first_line):
             return True, 0
         return False, 0
 
@@ -1009,7 +1126,7 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
             line = line.rstrip()
             # TODO: Name: could be Compound or SpectrumName
             if state == 'header':
-                if leader_terms_pattern.match(line):
+                if LEADER_TERMS_PATTERN.match(line):
                     state = 'body'
                     spectrum_file_offset = line_beginning_file_offset
                 else:
@@ -1017,7 +1134,7 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
             if state == 'body':
                 if len(line) == 0:
                     continue
-                if leader_terms_pattern.match(line):
+                if LEADER_TERMS_PATTERN.match(line):
                     if len(spectrum_buffer) > 0:
                         self.index.add(
                             number=n_spectra + start_index,
@@ -1032,7 +1149,7 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
                             logger.info(f"... Indexed  {file_offset} bytes, {n_spectra} spectra read")
 
                     spectrum_file_offset = line_beginning_file_offset
-                    spectrum_name = leader_terms_line_pattern.match(line).group(1)
+                    spectrum_name = LEADER_TERMS_LINE_PATTERN.match(line).group(1)
 
                 spectrum_buffer.append(line)
         logger.debug(f"Processed {file_offset} bytes, {n_spectra} spectra read")
@@ -1068,7 +1185,7 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
             if state == 'body':
                 if len(line) == 0:
                     continue
-                if leader_terms_pattern.match(line):
+                if LEADER_TERMS_PATTERN.match(line):
                     if len(spectrum_buffer) > 0:
                         return spectrum_buffer
                 spectrum_buffer.append(line)

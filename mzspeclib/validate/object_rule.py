@@ -3,12 +3,12 @@ import logging
 
 from typing import TYPE_CHECKING, List, Tuple
 
-from mzlib.attributes import Attributed
+from mzspeclib.attributes import Attributed
 
-from mzlib.spectrum import Spectrum
-from mzlib.annotation import IonAnnotationBase, InvalidAnnotation
+from mzspeclib.spectrum import Spectrum
+from mzspeclib.annotation import IonAnnotationBase, InvalidAnnotation
 
-from mzlib.validate.level import RequirementLevel
+from mzspeclib.validate.level import RequirementLevel
 
 if TYPE_CHECKING:
     from .validator import ValidatorBase

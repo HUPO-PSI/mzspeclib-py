@@ -1,10 +1,10 @@
 import click
 
-from mzlib import SpectrumLibrary
-from mzlib.backends import SpectralLibraryBackendBase, FormatInferenceFailure, TextSpectralLibraryWriter
-from mzlib.cluster import SpectrumCluster
-from mzlib.index import MemoryIndex, SQLIndex
-from mzlib.spectrum import Spectrum
+from mzspeclib import SpectrumLibrary
+from mzspeclib.backends import SpectralLibraryBackendBase, FormatInferenceFailure, TextSpectralLibraryWriter
+from mzspeclib.cluster import SpectrumCluster
+from mzspeclib.index import MemoryIndex, SQLIndex
+from mzspeclib.spectrum import Spectrum
 
 @click.command('first_n_entries')
 @click.argument('inpath', type=click.Path(exists=True))

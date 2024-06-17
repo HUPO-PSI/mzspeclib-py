@@ -1,8 +1,8 @@
 import os
 import unittest
 
-from mzlib.backends import TextSpectralLibrary
-from mzlib.cluster import SpectrumCluster
+from mzspeclib.backends import TextSpectralLibrary
+from mzspeclib.cluster import SpectrumCluster
 
 from .common import datafile
 

@@ -3,14 +3,14 @@ import os
 import pathlib
 
 from typing import Optional, Type, List, Union
-from mzlib.attributes import AttributeManagedProperty, AttributeManager
-from mzlib.backends.base import LIBRARY_DESCRIPTION_TERM, LIBRARY_NAME_TERM, LIBRARY_URI_TERM, LIBRARY_VERSION_TERM
-from mzlib.cluster import SpectrumCluster
+from mzspeclib.attributes import AttributeManagedProperty, AttributeManager
+from mzspeclib.backends.base import LIBRARY_DESCRIPTION_TERM, LIBRARY_NAME_TERM, LIBRARY_URI_TERM, LIBRARY_VERSION_TERM
+from mzspeclib.cluster import SpectrumCluster
 
-from mzlib.spectrum_library_index import SpectrumLibraryIndex
-from mzlib.spectrum import Spectrum
-from mzlib.index import IndexBase
-from mzlib.backends import guess_implementation, SpectralLibraryBackendBase, SpectralLibraryWriterBase
+from mzspeclib.spectrum_library_index import SpectrumLibraryIndex
+from mzspeclib.spectrum import Spectrum
+from mzspeclib.index import IndexBase
+from mzspeclib.backends import guess_implementation, SpectralLibraryBackendBase, SpectralLibraryWriterBase
 
 
 debug = False

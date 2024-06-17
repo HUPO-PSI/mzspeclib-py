@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from typing import Dict,  List
 
-from mzlib.attributes import AttributeManager, AttributeManagedProperty, AttributeGroupFacet
+from mzspeclib.attributes import AttributeManager, AttributeManagedProperty, AttributeGroupFacet
 from .utils import ensure_iter, flatten
 
 SIMILAR_SPECTRUM_KEYS = "MS:1003263|similar spectrum keys"

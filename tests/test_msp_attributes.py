@@ -1,7 +1,7 @@
 import unittest
 
-from mzlib.backends import (MSPSpectralLibrary)
-from mzlib.backends import msp
+from mzspeclib.backends import (MSPSpectralLibrary)
+from mzspeclib.backends import msp
 
 from .common import datafile
 

@@ -7,13 +7,13 @@ import warnings
 from typing import Any, Iterable, List, Dict, Mapping, Union
 
 from pathlib import Path
-from mzlib.cluster import SpectrumCluster
+from mzspeclib.cluster import SpectrumCluster
 
-from mzlib.index import MemoryIndex
-from mzlib.attributes import AttributeManager, Attributed, AttributeSet
-from mzlib.annotation import parse_annotation, IonAnnotationBase
-from mzlib.analyte import Analyte, Interpretation, FIRST_INTERPRETATION_KEY
-from mzlib.spectrum import Spectrum
+from mzspeclib.index import MemoryIndex
+from mzspeclib.attributes import AttributeManager, Attributed, AttributeSet
+from mzspeclib.annotation import parse_annotation, IonAnnotationBase
+from mzspeclib.analyte import Analyte, Interpretation, FIRST_INTERPRETATION_KEY
+from mzspeclib.spectrum import Spectrum
 
 from .base import SpectralLibraryBackendBase, SpectralLibraryWriterBase, FORMAT_VERSION_TERM, AttributeSetTypes
 from .utils import open_stream

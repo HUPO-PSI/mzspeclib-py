@@ -2,9 +2,9 @@ import math
 import os
 import unittest
 
-from mzlib.spectrum import Spectrum
-from mzlib.backends import (MSPSpectralLibrary, TextSpectralLibrary, JSONSpectralLibrary, SpectronautTSVSpectralLibrary, DIANNTSVSpectralLibrary)
-from mzlib.analyte import ANALYTE_MIXTURE_TERM
+from mzspeclib.spectrum import Spectrum
+from mzspeclib.backends import (MSPSpectralLibrary, TextSpectralLibrary, JSONSpectralLibrary, SpectronautTSVSpectralLibrary, DIANNTSVSpectralLibrary)
+from mzspeclib.analyte import ANALYTE_MIXTURE_TERM
 
 from .common import datafile
 

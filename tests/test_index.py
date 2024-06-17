@@ -2,8 +2,8 @@ import os
 import unittest
 import tempfile
 
-from mzlib.backends import TextSpectralLibrary
-from mzlib.index import MemoryIndex, SQLIndex
+from mzspeclib.backends import TextSpectralLibrary
+from mzspeclib.index import MemoryIndex, SQLIndex
 
 from .common import datafile
 

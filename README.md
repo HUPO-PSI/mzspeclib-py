@@ -8,6 +8,7 @@ spectral library format. It provides readers and writers for the Text and JSON s
 of `mzSpecLib`, as well as readers for the following spectral library formats found in the wild:
 
 - NIST MSP (also minimal writing facility)
+- SPTXT
 - BiblioSpec
 - EncyclopeDIA
 - DIA-NN

@@ -287,6 +287,15 @@ class SpectralLibraryBackendBase(AttributedEntity, _VocabularyResolverMixin, _Li
                     interpretation.add_analyte(analyte)
 
     def _is_analyte_defined(self, analyte: Analyte) -> bool:
+        """
+        Check if the :class:`~.Analyte` has been sufficiently described
+        by the attributes we've seen so far, either for a peptide or some
+        other kind of molecule.
+
+        If not, we'll do other work in :meth:`_hoist_analyte_attributes_on_rejection`
+        to move information out of the :class:`~.Analyte` up to the :class:`~.Spectrum`
+        and omit the analyte entirely.
+        """
         peptide_attr_root = self.find_term_for("MS:1003050")
         molecular_attr_root = self.find_term_for("MS:1003033")
         for attrib in analyte:
@@ -299,6 +308,10 @@ class SpectralLibraryBackendBase(AttributedEntity, _VocabularyResolverMixin, _Li
         return False
 
     def _hoist_analyte_attributes_on_rejection(self, analyte: Analyte, spectrum: Spectrum):
+        """
+        When an :class:`~.Analyte` is not defined well enough, move any terms
+        that are ion-related up to the :class:`~.Spectrum`.
+        """
         ion_selection_root = self.find_term_for("MS:1000455")
         attribute_groups_to_hoist = {}
         for attrib in analyte:

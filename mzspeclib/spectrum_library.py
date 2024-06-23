@@ -56,8 +56,9 @@ class SpectrumLibrary:
 
     _identifier = None
     _filename = None
+    _create_index: bool
 
-    def __init__(self, identifier=None, filename=None, format=None, index_type=None):
+    def __init__(self, identifier=None, filename=None, format=None, index_type=None, create_index=True):
         """
         __init__ - SpectrumLibrary constructor
 
@@ -73,9 +74,10 @@ class SpectrumLibrary:
             The type of index to preferentially construct.
         """
         self.backend = None
+        self._create_index = create_index
+        self._format = format
         self.identifier = identifier
         self.index_type = index_type
-        self._format = format
         self.filename = filename
 
     def _init_from_identifier(self):
@@ -98,7 +100,7 @@ class SpectrumLibrary:
                 raise ValueError(
                     f"Could not find an implementation for {self.format}")
             self.backend = backend_type(
-                self.filename, index_type=index_type)
+                self.filename, index_type=index_type, create_index=self._create_index)
             self._format = self.backend.format_name
         self._identifier = self.backend.identifier
 

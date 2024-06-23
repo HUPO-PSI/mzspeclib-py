@@ -25,14 +25,14 @@
         "1": {
           "attributes": [
             {
-              "accession": "MS:1000224",
-              "name": "molecular mass",
-              "value": 1710.9076
-            },
-            {
               "accession": "MS:1000888",
               "name": "stripped peptide sequence",
               "value": "AAAACALTPGPLADLAAR"
+            },
+            {
+              "accession": "MS:1000224",
+              "name": "molecular mass",
+              "value": 1710.9076
             },
             {
               "accession": "MS:1000041",
@@ -40,8 +40,8 @@
               "value": 2
             },
             {
-              "accession": "MS:1003208",
-              "name": "experimental precursor monoisotopic m/z",
+              "accession": "MS:1000744",
+              "name": "selected ion m/z",
               "value": 855.4538
             },
             {
@@ -533,14 +533,14 @@
         "1": {
           "attributes": [
             {
-              "accession": "MS:1000224",
-              "name": "molecular mass",
-              "value": 1710.9076
-            },
-            {
               "accession": "MS:1000888",
               "name": "stripped peptide sequence",
               "value": "AAAACALTPGPLADLAAR"
+            },
+            {
+              "accession": "MS:1000224",
+              "name": "molecular mass",
+              "value": 1710.9076
             },
             {
               "accession": "MS:1000041",
@@ -548,8 +548,8 @@
               "value": 2
             },
             {
-              "accession": "MS:1003208",
-              "name": "experimental precursor monoisotopic m/z",
+              "accession": "MS:1000744",
+              "name": "selected ion m/z",
               "value": 855.4538
             },
             {
@@ -1392,14 +1392,14 @@
         "1": {
           "attributes": [
             {
-              "accession": "MS:1000224",
-              "name": "molecular mass",
-              "value": 2414.3344
-            },
-            {
               "accession": "MS:1000888",
               "name": "stripped peptide sequence",
               "value": "AAAAGQTGTVPPGAPGALPLPGMAIVK"
+            },
+            {
+              "accession": "MS:1000224",
+              "name": "molecular mass",
+              "value": 2414.3344
             },
             {
               "accession": "MS:1000041",
@@ -1407,8 +1407,8 @@
               "value": 2
             },
             {
-              "accession": "MS:1003208",
-              "name": "experimental precursor monoisotopic m/z",
+              "accession": "MS:1000744",
+              "name": "selected ion m/z",
               "value": 1207.1672
             },
             {
@@ -2005,14 +2005,14 @@
         "1": {
           "attributes": [
             {
-              "accession": "MS:1000224",
-              "name": "molecular mass",
-              "value": 1463.8086
-            },
-            {
               "accession": "MS:1000888",
               "name": "stripped peptide sequence",
               "value": "AAAAGSTSVKPIFSR"
+            },
+            {
+              "accession": "MS:1000224",
+              "name": "molecular mass",
+              "value": 1463.8086
             },
             {
               "accession": "MS:1000041",
@@ -2020,8 +2020,8 @@
               "value": 2
             },
             {
-              "accession": "MS:1003208",
-              "name": "experimental precursor monoisotopic m/z",
+              "accession": "MS:1000744",
+              "name": "selected ion m/z",
               "value": 731.9043
             },
             {
@@ -2585,14 +2585,14 @@
         "1": {
           "attributes": [
             {
-              "accession": "MS:1000224",
-              "name": "molecular mass",
-              "value": 1464.8157
-            },
-            {
               "accession": "MS:1000888",
               "name": "stripped peptide sequence",
               "value": "AAAAGSTSVKPIFSR"
+            },
+            {
+              "accession": "MS:1000224",
+              "name": "molecular mass",
+              "value": 1464.8157
             },
             {
               "accession": "MS:1000041",
@@ -2600,8 +2600,8 @@
               "value": 3
             },
             {
-              "accession": "MS:1003208",
-              "name": "experimental precursor monoisotopic m/z",
+              "accession": "MS:1000744",
+              "name": "selected ion m/z",
               "value": 488.2719
             },
             {
@@ -3315,14 +3315,14 @@
         "1": {
           "attributes": [
             {
-              "accession": "MS:1000224",
-              "name": "molecular mass",
-              "value": 1661.7668
-            },
-            {
               "accession": "MS:1000888",
               "name": "stripped peptide sequence",
               "value": "AAAALGSHGSCSSEVEK"
+            },
+            {
+              "accession": "MS:1000224",
+              "name": "molecular mass",
+              "value": 1661.7668
             },
             {
               "accession": "MS:1000041",
@@ -3330,8 +3330,8 @@
               "value": 2
             },
             {
-              "accession": "MS:1003208",
-              "name": "experimental precursor monoisotopic m/z",
+              "accession": "MS:1000744",
+              "name": "selected ion m/z",
               "value": 830.8834
             },
             {
@@ -3766,14 +3766,14 @@
         "1": {
           "attributes": [
             {
-              "accession": "MS:1000224",
-              "name": "molecular mass",
-              "value": 1661.7668
-            },
-            {
               "accession": "MS:1000888",
               "name": "stripped peptide sequence",
               "value": "AAAALGSHGSCSSEVEK"
+            },
+            {
+              "accession": "MS:1000224",
+              "name": "molecular mass",
+              "value": 1661.7668
             },
             {
               "accession": "MS:1000041",
@@ -3781,8 +3781,8 @@
               "value": 2
             },
             {
-              "accession": "MS:1003208",
-              "name": "experimental precursor monoisotopic m/z",
+              "accession": "MS:1000744",
+              "name": "selected ion m/z",
               "value": 830.8834
             },
             {

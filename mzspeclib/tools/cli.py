@@ -10,6 +10,7 @@ from typing import DefaultDict, List
 from mzspeclib.spectrum_library import SpectrumLibrary
 from mzspeclib.index import MemoryIndex, SQLIndex
 from mzspeclib.backends.base import FormatInferenceFailure, SpectralLibraryBackendBase
+from mzspeclib.backends.utils import PreBufferedStreamReader
 from mzspeclib.validate import validator
 from mzspeclib.validate.level import RequirementLevel
 from mzspeclib.ontology import ControlledVocabularyResolver
@@ -86,7 +87,7 @@ def describe(path, diagnostics=False, input_format=None):
 
 
 @main.command("convert", short_help=("Convert a spectral library from one format to another"))
-@click.argument('inpath', type=click.Path(exists=True))
+@click.argument('inpath', type=click.Path(exists=True, allow_dash=False))
 @click.argument("outpath", type=click.Path())
 @click.option("-i", "--input-format", type=click.Choice(sorted(SpectralLibraryBackendBase._file_extension_to_implementation)))
 @click.option("-f", "--format", type=click.Choice(["text", "json", "msp"]), default="text")
@@ -108,8 +109,13 @@ def convert(inpath, outpath, format=None, header_file=None, library_attributes=(
     else:
         index_type = MemoryIndex
     click.echo(f"Opening {inpath}", err=True)
+
+    create_index = True
+    # if inpath == '-':
+    #     inpath = PreBufferedStreamReader(click.get_binary_stream("stdin"))
+    #     create_index = False
     try:
-        library = SpectrumLibrary(filename=inpath, index_type=index_type, format=input_format)
+        library = SpectrumLibrary(filename=inpath, index_type=index_type, format=input_format, create_index=create_index)
     except FormatInferenceFailure as err:
         click.echo(f"{err}", err=True)
         raise click.Abort()

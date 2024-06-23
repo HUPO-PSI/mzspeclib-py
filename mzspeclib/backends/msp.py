@@ -5,6 +5,7 @@ There are an uncountable number of dialects of MSP. This library attempts to
 cover a representative subset from the NIST and some found in the wild. If you
 encounter an MSP file that does not parse properly, please report it.
 """
+
 from dataclasses import dataclass, field
 import re
 import io
@@ -16,23 +17,44 @@ import warnings
 from fractions import Fraction
 
 from typing import (
-    Any, Callable, Collection,
-    Dict, List, Mapping, Optional,
-    Set, Tuple, Iterable, DefaultDict,
-    NamedTuple)
+    Any,
+    Callable,
+    Collection,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Set,
+    Tuple,
+    Iterable,
+    DefaultDict,
+    NamedTuple,
+)
 
 from pyteomics import proforma
 
 from mzspeclib import annotation
 
-from mzspeclib.analyte import FIRST_ANALYTE_KEY, FIRST_INTERPRETATION_KEY, Analyte, Interpretation, ProteinDescription
+from mzspeclib.analyte import (
+    FIRST_ANALYTE_KEY,
+    FIRST_INTERPRETATION_KEY,
+    Analyte,
+    Interpretation,
+    InterpretationMember,
+    ProteinDescription,
+)
 from mzspeclib.spectrum import Spectrum, SPECTRUM_NAME
 from mzspeclib.attributes import Attribute, AttributeManager, AttributeSet, Attributed
 
 from .base import (
-    DEFAULT_VERSION, FORMAT_VERSION_TERM, _PlainTextSpectralLibraryBackendBase,
-    LIBRARY_NAME_TERM, AttributeSetTypes, SpectralLibraryBackendBase,
-    SpectralLibraryWriterBase)
+    DEFAULT_VERSION,
+    FORMAT_VERSION_TERM,
+    _PlainTextSpectralLibraryBackendBase,
+    LIBRARY_NAME_TERM,
+    AttributeSetTypes,
+    SpectralLibraryBackendBase,
+    SpectralLibraryWriterBase,
+)
 from .utils import try_cast, open_stream, CaseInsensitiveDict
 
 
@@ -55,13 +77,13 @@ def _generate_numpeaks_keys():
     cases = (str.lower, str.title, str.upper)
     w1_cases = [c(w1) for c in cases]
     w2_cases = [c(w2) for c in cases]
-    return {(w1c + sep + w2c) for (sep, w1c, w2c) in
-            itertools.product(seps, w1_cases, w2_cases)}
+    return {(w1c + sep + w2c) for (sep, w1c, w2c) in itertools.product(seps, w1_cases, w2_cases)}
+
 
 NUM_PEAKS_KEYS = _generate_numpeaks_keys()
 
 LEADER_TERMS_PATTERN = re.compile(r"(Name|NAME|Compound|COMPOUND)\s*:")
-LEADER_TERMS_LINE_PATTERN = re.compile(r'(?:Name|NAME|Compound|COMPOUND)\s*:\s+(.+)')
+LEADER_TERMS_LINE_PATTERN = re.compile(r"(?:Name|NAME|Compound|COMPOUND)\s*:\s+(.+)")
 
 SPACE_SPLITTER = re.compile(r"\s+")
 
@@ -78,18 +100,14 @@ PeakLine = Tuple[float, float, List[annotation.IonAnnotationBase], List[Any]]
 PeakAggregateParseFn = Callable[[str], Any]
 
 
-class AttributeHandler:
-    keys: Collection[str]
-
-    def __init__(self, keys: Collection[str]):
-        if isinstance(keys, str):
-            keys = (keys, )
-        self.keys = keys
-
-    def __contains__(self, key):
-        return key in self.keys
-
+class _AttributeHelperBase:
     def add_value(self, key: str, value: Any, container: Attributed):
+        """
+        Add a single attribute to an :class:`~.Attributed` container.
+
+        Explicitly check for whether the attribute is already present with
+        the same value and skip the operation to avoid duplication.
+        """
         if container.has_attribute(key):
             existing = container.get_attribute(key)
             if existing == value:
@@ -97,31 +115,130 @@ class AttributeHandler:
         container.add_attribute(key, value)
 
     def add_group(self, keys: List[str], values: List[Any], container: Attributed):
+        """
+        Add a collection of attributes to an :class:`~.Attributed` container
+        that will be part of a single group.
+        """
         group_id = container.get_next_group_identifier()
         for k, v in zip(keys, values):
             container.add_attribute(k, v, group_id)
 
+    def deduplicate_attribute(self, container: Attributed, attribute_name: str) -> int:
+        try:
+            attrs = container.get_attribute(attribute_name, raw=True)
+        except KeyError:
+            return 0
+        if isinstance(attrs, list):
+            # Sometimes there are multiple entries that map to molecular mass, and one is the nominal
+            # mass. Prefer listing the most precise mass first. Apply the same logic to all attributes.
+            attrs.sort(key=lambda x: len(str(x.value)), reverse=True)
+            container.remove_attribute(attrs[0].key)
+            seen_values = set()
+            for attr in attrs:
+                key = (attr.value, attr.group_id)
+                if key in seen_values:
+                    continue
+                seen_values.add(key)
+                container.add_attribute(attr.key, attr.value, attr.group_id)
+            return len(attrs) - len(seen_values)
+        return 0
+
+
+class AttributeHandler(_AttributeHelperBase):
+    """
+    A base type for managing conversion of specific keys or sets of keys and their values
+    to controlled vocabulary attributes.
+    """
+
+    keys: Collection[str]
+
+    def __init__(self, keys: Collection[str]):
+        if isinstance(keys, str):
+            keys = (keys,)
+        self.keys = keys
+
+    def __contains__(self, key):
+        return key in self.keys
+
     def handle(self, key: str, value: Any, container: Attributed) -> bool:
+        """
+        Determine what, if any, and how to add this attribute to an
+        :class:`~.Attributed` container.
+
+        .. note::
+            If this operation is successful, return :const:`True`, otherwise
+            return :const:`False` to signal that another :class:`AttributeHandler`
+            should try to handle this input, like "bubbling" in event handling
+            systems.
+
+        The :meth:`__call__` syntax is short-hand for this method.
+
+        Arguments
+        ---------
+        key : :class:`str`
+            The MSP comment key to map to an attribute
+        value : :class:`Any`
+            The interpreted value of the MSP comment. It may be a :class:`str` or
+            already coerced into another value like a number.
+        container : :class:`~.Attributed`
+            The object to add the translated attribute to if appropriate.
+
+        Returns
+        -------
+        :class:`bool`
+        """
         raise NotImplementedError()
 
     def __call__(self, key: str, value: Any, container: Attributed) -> bool:
+        """See :meth:`handle`"""
         return self.handle(key, value, container)
 
-    def chain(self, handler: 'AttributeHandler') -> 'AttributeHandlerChain':
+    def chain(self, handler: "AttributeHandler") -> "AttributeHandlerChain":
+        """
+        Combine this :class:`AttributeHandler` with another :class:`AttributeHandler`
+        to be applied in sequence.
+
+        The :meth:`__and__` syntax is short-hand for this method.
+
+        Returns
+        -------
+        :class:`AttributeHandlerChain`
+        """
         return AttributeHandlerChain([self, handler])
 
-    def __and__(self, handler: 'AttributeHandler') -> 'AttributeHandlerChain':
+    def __and__(self, handler: "AttributeHandler") -> "AttributeHandlerChain":
         return self.chain(handler)
 
 
 class MappingAttributeHandler(AttributeHandler):
+    """
+    An :class:`AttributeHandler` which uses a :class:`Mapping` to conveniently
+    define the relationship between a comment key and the appropriate controlled
+    vocabulary term.
+
+    The behavior is handled differently depending upon the value in ``self.keys[key]``:
+        - Scalar: ``self.keys[key]`` is the controlled vocabulary term used,
+          and the comment value is minimally processed.
+        - List of 2 Items and comment value is :const:`None`: ``self.keys[key][0]`` is the controlled vocabulary term
+          and ``self.keys[key][1]`` is the value.
+        - :class:`AttributeHandler`: All handling is delegated to ``self.keys[key](key, value, container)``
+        - Mapping: The comment value is used to find the appropriate scalar or list to add.
+        - List of Pairs: All pairs from the list are added with :meth:`add_group`.
+
+    More complex transformations should be defined using an explicit rule
+    like :class:`FunctionAttributeHandler` or some other sub-class if appropriate.
+    """
+
     keys: Dict[str, Any]
 
     def __init__(self, keys: Dict[str, Any]):
         self.keys = keys
 
     def handle(self, key: str, value: Any, container: Attributed) -> bool:
-        trans_key = self.keys[key]
+        try:
+            trans_key = self.keys[key]
+        except KeyError:
+            breakpoint()
         if value is None:
             if isinstance(trans_key, list):
                 k, v = trans_key
@@ -153,6 +270,13 @@ class MappingAttributeHandler(AttributeHandler):
 
 
 class AttributeHandlerChain:
+    """
+    An :class:`AttributeHandler` that sequentially applies a list
+    of :class:`AttributeHandler`s until it finds one that works.
+
+    This type exists to make handler composition easier.
+    """
+
     chain: List[AttributeHandler]
 
     def __init__(self, chain: List[AttributeHandler]):
@@ -178,37 +302,12 @@ class AttributeHandlerChain:
     def __call__(self, key: str, value: Any, container: Attributed) -> bool:
         return self.handle(key, value, container)
 
-    def chain(self, handler: 'AttributeHandler') -> 'AttributeHandlerChain':
+    def chain(self, handler: "AttributeHandler") -> "AttributeHandlerChain":
         return self.__class__(self.chain + [handler])
 
     def add(self, handler: AttributeHandler):
         self.chain.append(handler)
         return handler
-
-
-class RegexAttributeHandler(AttributeHandler):
-    pattern: re.Pattern
-    variable_attributes: List[str]
-    constant_attributes: Optional[List[Tuple[str, Any]]]
-
-    def __init__(self, keys: Collection[str], pattern: re.Pattern, variable_attributes, constant_attributes=None):
-        super().__init__(keys)
-        self.pattern = pattern
-        self.variable_attributes = variable_attributes
-        self.constant_attributes = constant_attributes
-
-    def handle(self, key: str, value: Any, container: Attributed) -> bool:
-        match = self.pattern.match(value)
-        if match:
-            if self.constant_attributes:
-                ks, vs = map(list, zip(*self.constant_attributes))
-                ks.extend(self.variable_attributes)
-                vs.extend(match.groups())
-                self.add_group(ks, vs, container)
-            else:
-                self.add_value(self.variable_attributes[0], match.group(1), container)
-            return True
-        return False
 
 
 class FunctionAttributeHandler(AttributeHandler):
@@ -225,6 +324,7 @@ class FunctionAttributeHandler(AttributeHandler):
     def wraps(cls, *keys):
         def wrapper(func):
             return cls(keys, func)
+
         return wrapper
 
 
@@ -252,7 +352,6 @@ class DispatchingAttributeHandler(AttributeHandlerChain):
         for key in handler.keys:
             self.mapping[key] = handler
         return handler
-
 
 
 analyte_terms = CaseInsensitiveDict(
@@ -306,6 +405,7 @@ analyte_terms = CaseInsensitiveDict(
             ],
         },
         "MC": "MS:1003044|number of missed cleavages",
+        "NMC": "MS:1003044|number of missed cleavages",
         "Mods": PEPTIDE_MODIFICATION_TERM,
         "Naa": "MS:1003043|number of residues",
         "Parent": "MS:1000744|selected ion m/z",
@@ -322,40 +422,65 @@ analyte_terms = CaseInsensitiveDict(
 )
 
 
-_HCD = ["MS:1000044|dissociation method", "MS:1000422|beam-type collision-induced dissociation"]
+_HCD = [
+    "MS:1000044|dissociation method",
+    "MS:1000422|beam-type collision-induced dissociation",
+]
 
 # TODO: qtof -> CAD
-instrument_dispatch = CaseInsensitiveDict({
-    "it": [["MS:1000044|dissociation method", "MS:1002472|trap-type collision-induced dissociation"]],
-    "hcd": [_HCD],
-    "QExactive": [_HCD],
-    "Elite": [_HCD],
-})
+instrument_dispatch = CaseInsensitiveDict(
+    {
+        "it": [
+            [
+                "MS:1000044|dissociation method",
+                "MS:1002472|trap-type collision-induced dissociation",
+            ]
+        ],
+        "hcd": [_HCD],
+        "QExactive": [_HCD],
+        "Elite": [_HCD],
+    }
+)
 
 
-other_terms = CaseInsensitiveDict({
-    "Single": ["MS:1003065|spectrum aggregation type", "MS:1003066|singleton spectrum"],
-    "Consensus": ["MS:1003065|spectrum aggregation type", "MS:1003067|consensus spectrum"],
-    "Inst": instrument_dispatch,
-    "Instrument_type": instrument_dispatch,
-    "Spec": {"Consensus": [["MS:1003065|spectrum aggregation type", "MS:1003067|consensus spectrum"]]},
-    "Scan": "MS:1003057|scan number",
-    "Origfile": "MS:1003203|constituent spectrum file",
-    "filename": "MS:1003203|constituent spectrum file",
-    "file_name": "MS:1003203|constituent spectrum file",
-    "Sample": "MS:1000002|sample name",
-    "Filter": "MS:1000512|filter string",
-    "FTResolution": "MS:1000028|detector resolution",
-    "ms1PrecursorAb": "MS:1003085|previous MS1 scan precursor intensity",
-    "Precursor1MaxAb": "MS:1003086|precursor apex intensity",
-    "Purity": "MS:1009013|isolation window precursor purity",
-    "Num peaks": "MS:1003059|number of peaks",
-    "Num Peaks": "MS:1003059|number of peaks",
-    "num_peaks": "MS:1003059|number of peaks",
-    "numpeaks": "MS:1003059|number of peaks",
-    "Run": "MS:1003203|constituent spectrum file",
-    "Splash": "MS:1002599|splash key",
-})
+other_terms = CaseInsensitiveDict(
+    {
+        "Single": [
+            "MS:1003065|spectrum aggregation type",
+            "MS:1003066|singleton spectrum",
+        ],
+        "Consensus": [
+            "MS:1003065|spectrum aggregation type",
+            "MS:1003067|consensus spectrum",
+        ],
+        "Inst": instrument_dispatch,
+        "Instrument_type": instrument_dispatch,
+        "Spec": {
+            "Consensus": [
+                [
+                    "MS:1003065|spectrum aggregation type",
+                    "MS:1003067|consensus spectrum",
+                ]
+            ]
+        },
+        "Scan": "MS:1003057|scan number",
+        "Origfile": "MS:1003203|constituent spectrum file",
+        "filename": "MS:1003203|constituent spectrum file",
+        "file_name": "MS:1003203|constituent spectrum file",
+        "Sample": "MS:1000002|sample name",
+        "Filter": "MS:1000512|filter string",
+        "FTResolution": "MS:1000028|detector resolution",
+        "ms1PrecursorAb": "MS:1003085|previous MS1 scan precursor intensity",
+        "Precursor1MaxAb": "MS:1003086|precursor apex intensity",
+        "Purity": "MS:1009013|isolation window precursor purity",
+        "Num peaks": "MS:1003059|number of peaks",
+        "Num Peaks": "MS:1003059|number of peaks",
+        "num_peaks": "MS:1003059|number of peaks",
+        "numpeaks": "MS:1003059|number of peaks",
+        "Run": "MS:1003203|constituent spectrum file",
+        "Splash": "MS:1002599|splash key",
+    }
+)
 
 
 @FunctionAttributeHandler.wraps("num_unassigned_peaks")
@@ -390,36 +515,40 @@ interpretation_terms = CaseInsensitiveDict(
 )
 
 
-interpretation_member_terms = CaseInsensitiveDict({
-    "Q-value": "MS:1002354|PSM-level q-value",
-})
+interpretation_member_terms = CaseInsensitiveDict(
+    {
+        "Q-value": "MS:1002354|PSM-level q-value",
+    }
+)
 
 
 species_map = {
-    "human": [["MS:1001467|taxonomy: NCBI TaxID", "NCBITaxon:9606|Homo sapiens"],
-                ["MS:1001469|taxonomy: scientific name",
-                    "Homo sapiens"],
-                ["MS:1001468|taxonomy: common name", "human"]],
-    "zebrafish": [["MS:1001467|taxonomy: NCBI TaxID", "NCBITaxon:7955|Danio rerio"],
-                    ["MS:1001469|taxonomy: scientific name",
-                        "Danio rerio"],
-                    ["MS:1001468|taxonomy: common name", "zebra fish"]],
-    "chicken": [["MS:1001467|taxonomy: NCBI TaxID", "NCBITaxon:9031|Gallus gallus"],
-                ["MS:1001469|taxonomy: scientific name",
-                    "Gallus gallus"],
-                ["MS:1001468|taxonomy: common name", "chicken"]],
+    "human": [
+        ["MS:1001467|taxonomy: NCBI TaxID", "NCBITaxon:9606|Homo sapiens"],
+        ["MS:1001469|taxonomy: scientific name", "Homo sapiens"],
+        ["MS:1001468|taxonomy: common name", "human"],
+    ],
+    "zebrafish": [
+        ["MS:1001467|taxonomy: NCBI TaxID", "NCBITaxon:7955|Danio rerio"],
+        ["MS:1001469|taxonomy: scientific name", "Danio rerio"],
+        ["MS:1001468|taxonomy: common name", "zebra fish"],
+    ],
+    "chicken": [
+        ["MS:1001467|taxonomy: NCBI TaxID", "NCBITaxon:9031|Gallus gallus"],
+        ["MS:1001469|taxonomy: scientific name", "Gallus gallus"],
+        ["MS:1001468|taxonomy: common name", "chicken"],
+    ],
     "rat": [
         ["MS:1001467|taxonomy: NCBI TaxID", "NCBITaxon:10116|Rattus norvegicus"],
-        ["MS:1001469|taxonomy: scientific name",
-         "Rattus norvegicus"],
-        ["MS:1001468|taxonomy: common name", "rat"]
-    ]
+        ["MS:1001469|taxonomy: scientific name", "Rattus norvegicus"],
+        ["MS:1001468|taxonomy: common name", "rat"],
+    ],
 }
 
 
 MODIFICATION_NAME_MAP = {
     "CAM": "Carbamidomethyl",
-    "Pyro_glu": "Glu->pyro-Glu", # Resolves UNIMOD ambiguity
+    "Pyro_glu": "Glu->pyro-Glu",  # Resolves UNIMOD ambiguity
     "Pyro-glu": "Gln->pyro-Glu",
     "Oxidation": "Oxidation",
     "Phospho": "Phospho",
@@ -429,15 +558,13 @@ MODIFICATION_NAME_MAP = {
     "TMT": "TMT6plex",
 }
 
-TERMINAL_MODIFICATIONS = {
-    "Acetyl",
-    "TMT6plex"
-}
+TERMINAL_MODIFICATIONS = {"Acetyl", "TMT6plex"}
 
 
 # TODO: ppm is unsigned, add mass calculation to determine true mass accuracy
 
-annotation_pattern = re.compile(r"""^
+annotation_pattern = re.compile(
+    r"""^
 (?:(?:(?P<series>[abyxcz]\.?)(?P<ordinal>\d+))|
    (:?(?P<series_internal>(?:Int/[ARNDCEQGHKMFPSTWYVILJarndceqghkmfpstwyvilj]+)|(?:[mM](?P<internal_start>\d+):(?P<internal_end>\d+))))|
    (?P<precursor>p)|
@@ -451,48 +578,98 @@ annotation_pattern = re.compile(r"""^
 (?:\^(?P<charge>[+-]?\d+))?
 (?:(?P<isotope>[+-]?\d*)i)?)+
 (?:/(?:Dev=)?(?P<mass_error>[+-]?\d+(?:\.\d+))(?P<mass_error_unit>ppm)?)?
-""", re.X)
+""",
+    re.X,
+)
 
 
 class MSPAnnotationStringParser(annotation.AnnotationStringParser):
-    def _dispatch(self, annotation_string, data, adducts, charge, isotope, neutral_losses, analyte_reference, mass_error, confidence, **kwargs):
-        data['sequence_ordinal'] = None
-        data['sequence_internal'] = None
-        return super()._dispatch(annotation_string, data, adducts, charge, isotope, neutral_losses, analyte_reference, mass_error, confidence, **kwargs)
+    def _dispatch(
+        self,
+        annotation_string,
+        data,
+        adducts,
+        charge,
+        isotope,
+        neutral_losses,
+        analyte_reference,
+        mass_error,
+        confidence,
+        **kwargs,
+    ):
+        data["sequence_ordinal"] = None
+        data["sequence_internal"] = None
+        return super()._dispatch(
+            annotation_string,
+            data,
+            adducts,
+            charge,
+            isotope,
+            neutral_losses,
+            analyte_reference,
+            mass_error,
+            confidence,
+            **kwargs,
+        )
 
-    def _dispatch_internal_peptide_fragment(self, data: Dict[str, Any], adducts: List, charge: int, isotope: int, neutral_losses: List,
-                                            analyte_reference: Any, mass_error: Any, **kwargs):
-        if data['internal_start']:
+    def _dispatch_internal_peptide_fragment(
+        self,
+        data: Dict[str, Any],
+        adducts: List,
+        charge: int,
+        isotope: int,
+        neutral_losses: List,
+        analyte_reference: Any,
+        mass_error: Any,
+        **kwargs,
+    ):
+        if data["internal_start"]:
             # The hybrid pattern detected an m<start>:<end> type string, not an Int/seq string
             return super(MSPAnnotationStringParser, self)._dispatch_internal_peptide_fragment(
-                data, adducts, charge, isotope, neutral_losses, analyte_reference, mass_error, **kwargs)
+                data,
+                adducts,
+                charge,
+                isotope,
+                neutral_losses,
+                analyte_reference,
+                mass_error,
+                **kwargs,
+            )
 
         spectrum = kwargs.get("spectrum")
         if spectrum is None:
-            raise ValueError("Cannot infer sequence coordinates from MSP internal fragmentation notation without"
-                             " a reference to the spectrum, please pass spectrum as a keyword argument")
-        sequence = self._get_peptide_sequence_for_analyte(
-            spectrum, analyte_reference)
-        subseq = data['series_internal']
+            raise ValueError(
+                "Cannot infer sequence coordinates from MSP internal fragmentation notation without"
+                " a reference to the spectrum, please pass spectrum as a keyword argument"
+            )
+        sequence = self._get_peptide_sequence_for_analyte(spectrum, analyte_reference)
+        subseq = data["series_internal"]
         if subseq.startswith("Int/"):
             subseq = subseq[4:]
         subseq = subseq.upper()
         try:
             start_index = sequence.index(subseq)
         except ValueError as err:
-            raise ValueError(
-                f"Cannot locate internal subsequence {subseq} in {sequence}") from err
+            raise ValueError(f"Cannot locate internal subsequence {subseq} in {sequence}") from err
         end_index = start_index + len(subseq)
-        data['internal_start'] = start_index + 1
-        data['internal_end'] = end_index
+        data["internal_start"] = start_index + 1
+        data["internal_end"] = end_index
         return super(MSPAnnotationStringParser, self)._dispatch_internal_peptide_fragment(
-            data, adducts, charge, isotope, neutral_losses, analyte_reference, mass_error, **kwargs)
+            data,
+            adducts,
+            charge,
+            isotope,
+            neutral_losses,
+            analyte_reference,
+            mass_error,
+            **kwargs,
+        )
 
     def _coerce_isotope(self, data):
-        value = data.get('isotope')
+        value = data.get("isotope")
         if value is not None:
-            if value == '':
-                data['isotope'] = '1'
+            if value == "":
+                data["isotope"] = "1"
         return super()._coerce_isotope(data)
 
     def _coerce_neutral_losses(self, data: Dict[str, str]) -> List:
@@ -501,19 +678,36 @@ class MSPAnnotationStringParser(annotation.AnnotationStringParser):
     def _coerce_analyte_reference(self, data: Dict[str, str]) -> str:
         return None
 
-    def _dispatch_immonium(self, data: Dict[str, Any], adducts: List, charge: int, isotope: int, neutral_losses: List,
-                           analyte_reference: Any, mass_error: Any, **kwargs):
-        modification = data['immonium_modification']
+    def _dispatch_immonium(
+        self,
+        data: Dict[str, Any],
+        adducts: List,
+        charge: int,
+        isotope: int,
+        neutral_losses: List,
+        analyte_reference: Any,
+        mass_error: Any,
+        **kwargs,
+    ):
+        modification = data["immonium_modification"]
         if modification is not None:
             try:
                 modification = MODIFICATION_NAME_MAP[modification]
-                data['immonium_modification'] = modification
+                data["immonium_modification"] = modification
             except KeyError as err:
                 print(f"Failed to convert immonium ion modification {modification}")
         return super(MSPAnnotationStringParser, self)._dispatch_immonium(
-            data, adducts, charge, isotope, neutral_losses, analyte_reference, mass_error, **kwargs)
+            data,
+            adducts,
+            charge,
+            isotope,
+            neutral_losses,
+            analyte_reference,
+            mass_error,
+            **kwargs,
+        )
 
-    def _get_peptide_sequence_for_analyte(self, spectrum: Spectrum, analyte_reference: Optional[Any]=None) -> str:
+    def _get_peptide_sequence_for_analyte(self, spectrum: Spectrum, analyte_reference: Optional[Any] = None) -> str:
         if analyte_reference is None:
             if len(spectrum.analytes) == 0:
                 return None
@@ -522,7 +716,7 @@ class MSPAnnotationStringParser(annotation.AnnotationStringParser):
         analyte = spectrum.analytes.get(analyte_reference)
         if analyte is None:
             return None
-        return analyte.get_attribute('MS:1000888|stripped peptide sequence')
+        return analyte.get_attribute("MS:1000888|stripped peptide sequence")
 
 
 parse_annotation = MSPAnnotationStringParser(annotation_pattern)
@@ -534,7 +728,7 @@ class ModificationParser:
     modification_map: Dict[str, str]
     unknown_modifications: Set[str]
 
-    def __init__(self, pattern: str=None, modification_map: Dict[str, str]=None):
+    def __init__(self, pattern: str = None, modification_map: Dict[str, str] = None):
         if pattern is None:
             pattern = MODIFICATION_LIST_PARSER.pattern
         if modification_map is None:
@@ -602,10 +796,10 @@ def polarity_handler(key: str, value: str, container: Attributed) -> bool:
     negative = "MS:1000129|negative scan"
 
     if isinstance(value, str):
-        value = value.lower().strip('"\'')
-        if value == 'positive' or value == "+":
+        value = value.lower().strip("\"'")
+        if value == "positive" or value == "+":
             value = positive
-        elif value == 'negative' or value == "-":
+        elif value == "negative" or value == "-":
             value = negative
         else:
             raise ValueError(f"Can't infer scan polarity from {value}")
@@ -617,23 +811,31 @@ def polarity_handler(key: str, value: str, container: Attributed) -> bool:
 @msp_spectrum_attribute_handler.add
 @FunctionAttributeHandler.wraps("HCD")
 def dissociation_method_handler(key: str, value: str, container: Attributed) -> bool:
-    container.add_attribute("MS:1000044|dissociation method",
-                            "MS:1000422|beam-type collision-induced dissociation")
+    container.add_attribute(
+        "MS:1000044|dissociation method",
+        "MS:1000422|beam-type collision-induced dissociation",
+    )
     found_match = False
     if value is not None:
         match = re.match(r"([\d\.]+)\s*ev", value, flags=re.IGNORECASE)
         if match is not None:
             found_match = True
             group_identifier = container.get_next_group_identifier()
-            container.add_attribute("MS:1000045|collision energy",
-                                try_cast(match.group(1)), group_identifier)
+            container.add_attribute(
+                "MS:1000045|collision energy",
+                try_cast(match.group(1)),
+                group_identifier,
+            )
             container.add_attribute("UO:0000000|unit", "UO:0000266|electronvolt", group_identifier)
         match = re.match(r"([\d\.]+)\s*%", value)
         if match is not None:
             found_match = True
             group_identifier = container.get_next_group_identifier()
-            container.add_attribute("MS:1000045|collision energy",
-                                try_cast(match.group(1)), group_identifier)
+            container.add_attribute(
+                "MS:1000045|collision energy",
+                try_cast(match.group(1)),
+                group_identifier,
+            )
             container.add_attribute("UO:0000000|unit", "UO:0000187|percent", group_identifier)
     return found_match
 
@@ -651,10 +853,8 @@ def collision_energy_handler(key: str, value: str, container: Attributed) -> boo
             warnings.warn(f"Failed to parse {value} for {key} in collision_energy_handler")
     if value is not None:
         group_identifier = container.get_next_group_identifier()
-        container.add_attribute(
-            "MS:1000045|collision energy", value, group_identifier)
-        container.add_attribute(
-            "UO:0000000|unit", "UO:0000266|electronvolt", group_identifier)
+        container.add_attribute("MS:1000045|collision energy", value, group_identifier)
+        container.add_attribute("UO:0000000|unit", "UO:0000266|electronvolt", group_identifier)
         return True
     return False
 
@@ -668,10 +868,8 @@ def normalized_collision_energy_handler(key: str, value: str, container: Attribu
             value = try_cast(match.group(1))
     if value is not None:
         group_identifier = container.get_next_group_identifier()
-        container.add_attribute(
-            "MS:1000138|normalized collision energy", value, group_identifier)
-        container.add_attribute(
-            "UO:0000000|unit", "UO:0000187|percent", group_identifier)
+        container.add_attribute("MS:1000138|normalized collision energy", value, group_identifier)
+        container.add_attribute("UO:0000000|unit", "UO:0000187|percent", group_identifier)
         return True
     return False
 
@@ -683,25 +881,24 @@ def rt_handler(key, value, container) -> bool:
         container.add_attribute("MS:1000894|retention time", try_cast(value))
         return True
     else:
-        match = re.match(r"([\d\.]+)\s*(\D*)",
-                        value)
+        match = re.match(r"([\d\.]+)\s*(\D*)", value)
         if match is not None:
             if match.group(2):
-                container.add_attribute(
-                    "ERROR", f"Need more RT parsing code to handle this value")
+                container.add_attribute("ERROR", f"Need more RT parsing code to handle this value")
                 return False
             else:
                 group_identifier = container.get_next_group_identifier()
                 container.add_attribute(
-                    "MS:1000894|retention time", try_cast(match.group(1)), group_identifier)
+                    "MS:1000894|retention time",
+                    try_cast(match.group(1)),
+                    group_identifier,
+                )
                 #### If the value is greater than 250, assume it must be seconds
-                if float(match.group(1)) > 250 or key.lower() == 'rtinseconds':
-                    container.add_attribute(
-                        "UO:0000000|unit", "UO:0000010|second", group_identifier)
+                if float(match.group(1)) > 250 or key.lower() == "rtinseconds":
+                    container.add_attribute("UO:0000000|unit", "UO:0000010|second", group_identifier)
                 #### Although normally assume minutes
                 else:
-                    container.add_attribute(
-                        "UO:0000000|unit", "UO:0000031|minute", group_identifier)
+                    container.add_attribute("UO:0000000|unit", "UO:0000031|minute", group_identifier)
                 return True
     return False
 
@@ -712,15 +909,11 @@ def isolation_width_handler(key, value, container) -> bool:
     if value is None:
         return False
     group_identifier = container.get_next_group_identifier()
-    container.add_attribute("MS:1000828|isolation window lower offset",
-        (float(value) / 2), group_identifier)
-    container.add_attribute("UO:0000000|unit",
-                        "MS:1000040|m/z", group_identifier)
+    container.add_attribute("MS:1000828|isolation window lower offset", (float(value) / 2), group_identifier)
+    container.add_attribute("UO:0000000|unit", "MS:1000040|m/z", group_identifier)
     group_identifier = container.get_next_group_identifier()
-    container.add_attribute("MS:1000829|isolation window upper offset",
-        (float(value) / 2), group_identifier)
-    container.add_attribute("UO:0000000|unit",
-                        "MS:1000040|m/z", group_identifier)
+    container.add_attribute("MS:1000829|isolation window upper offset", (float(value) / 2), group_identifier)
+    container.add_attribute("UO:0000000|unit", "MS:1000040|m/z", group_identifier)
     return True
 
 
@@ -730,28 +923,20 @@ def mz_diff_handler(key, value, container: Attributed) -> bool:
     if isinstance(value, float):
         # We must be dealing with a unit-less entry.
         group_identifier = container.get_next_group_identifier()
-        container.add_attribute(
-            "MS:1001975|delta m/z", abs(value), group_identifier)
-        container.add_attribute(
-            "UO:0000000|unit", "MS:1000040|m/z", group_identifier)
+        container.add_attribute("MS:1001975|delta m/z", abs(value), group_identifier)
+        container.add_attribute("UO:0000000|unit", "MS:1000040|m/z", group_identifier)
     else:
-        match = re.match(
-            r"([\-\+e\d\.]+)\s*ppm", value, flags=re.IGNORECASE)
+        match = re.match(r"([\-\+e\d\.]+)\s*ppm", value, flags=re.IGNORECASE)
         if match is not None:
             group_identifier = container.get_next_group_identifier()
-            container.add_attribute(
-                "MS:1001975|delta m/z", try_cast(match.group(1)), group_identifier)
-            container.add_attribute(
-                "UO:0000000|unit", "UO:0000169|parts per million", group_identifier)
+            container.add_attribute("MS:1001975|delta m/z", try_cast(match.group(1)), group_identifier)
+            container.add_attribute("UO:0000000|unit", "UO:0000169|parts per million", group_identifier)
         else:
-            match = re.match(
-                r"([\-\+e\d\.]+)\s*", value)
+            match = re.match(r"([\-\+e\d\.]+)\s*", value)
             if match is not None:
                 group_identifier = container.get_next_group_identifier()
-                container.add_attribute(
-                    "MS:1001975|delta m/z", try_cast(match.group(1)), group_identifier)
-                container.add_attribute(
-                    "UO:0000000|unit", "MS:1000040|m/z", group_identifier)
+                container.add_attribute("MS:1001975|delta m/z", try_cast(match.group(1)), group_identifier)
+                container.add_attribute("UO:0000000|unit", "MS:1000040|m/z", group_identifier)
             else:
                 return False
     return True
@@ -763,10 +948,8 @@ def dev_ppm_handler(key, value, container) -> bool:
     if value is None:
         return False
     group_identifier = container.get_next_group_identifier()
-    container.add_attribute(
-        "MS:1001975|delta m/z", try_cast(value), group_identifier)
-    container.add_attribute(
-        "UO:0000000|unit", "UO:0000169|parts per million", group_identifier)
+    container.add_attribute("MS:1001975|delta m/z", try_cast(value), group_identifier)
+    container.add_attribute("UO:0000000|unit", "UO:0000169|parts per million", group_identifier)
     return True
 
 
@@ -777,22 +960,19 @@ def nreps_handler(key, value, container):
         return False
     if not isinstance(value, str):
         value = str(value)
-    match = re.match(
-        r"(\d+)/(\d+)", value)
+    match = re.match(r"(\d+)/(\d+)", value)
     if match is not None:
-        container.add_attribute(
-            "MS:1003070|number of replicate spectra used", try_cast(match.group(1)))
-        container.add_attribute(
-            "MS:1003069|number of replicate spectra available", try_cast(match.group(2)))
+        container.add_attribute("MS:1003070|number of replicate spectra used", try_cast(match.group(1)))
+        container.add_attribute("MS:1003069|number of replicate spectra available", try_cast(match.group(2)))
         return True
     else:
-        match = re.match(
-            r"(\d+)", value)
+        match = re.match(r"(\d+)", value)
         if match is not None:
+            container.add_attribute("MS:1003070|number of replicate spectra used", try_cast(match.group(1)))
             container.add_attribute(
-                "MS:1003070|number of replicate spectra used", try_cast(match.group(1)))
-            container.add_attribute(
-                "MS:1003069|number of replicate spectra available", try_cast(match.group(1)))
+                "MS:1003069|number of replicate spectra available",
+                try_cast(match.group(1)),
+            )
             return True
         else:
             return False
@@ -808,8 +988,7 @@ def organism_handler(key, value, container):
     if value in species_map:
         group_identifier = container.get_next_group_identifier()
         for item in species_map[value]:
-            container.add_attribute(
-                item[0], try_cast(item[1]), group_identifier)
+            container.add_attribute(item[0], try_cast(item[1]), group_identifier)
         return True
     return False
 
@@ -823,14 +1002,23 @@ def protein_handler(key, value, container: Attributed):
     match = re.match(r"\(pre=(.),post=(.)\)", value)
     group_identifier = None
     if match is not None:
-        value = value[:match.start()]
+        value = value[: match.start()]
         group_identifier = container.get_next_group_identifier()
-        container.add_attribute("MS:1001112|n-terminal flanking residue",
-                                match.group(1), group_identifier=group_identifier)
-        container.add_attribute("MS:1001113|c-terminal flanking residue",
-                                match.group(2), group_identifier=group_identifier)
-    container.add_attribute(key, re.sub(r"\(pre=(.),post=(.)\)", '', value.strip('"').strip("'")),
-                            group_identifier=group_identifier)
+        container.add_attribute(
+            "MS:1001112|n-terminal flanking residue",
+            match.group(1),
+            group_identifier=group_identifier,
+        )
+        container.add_attribute(
+            "MS:1001113|c-terminal flanking residue",
+            match.group(2),
+            group_identifier=group_identifier,
+        )
+    container.add_attribute(
+        key,
+        re.sub(r"\(pre=(.),post=(.)\)", "", value.strip('"').strip("'")),
+        group_identifier=group_identifier,
+    )
     return True
 
 
@@ -849,7 +1037,7 @@ def base_peak_handler(key, value, container: Attributed):
 class _UnknownTermTracker:
     counts: DefaultDict
 
-    def add(self, key: str, value: Optional[str]=None):
+    def add(self, key: str, value: Optional[str] = None):
         """Add an unknown attribute to the tracker"""
         raise NotImplementedError()
 
@@ -867,7 +1055,7 @@ class UnknownKeyValueTracker(_UnknownTermTracker):
     def __init__(self) -> None:
         self.counts = DefaultDict(lambda: DefaultDict(int))
 
-    def add(self, key: str, value: Optional[str]=None):
+    def add(self, key: str, value: Optional[str] = None):
         self.counts[key][value] += 1
 
 
@@ -891,9 +1079,271 @@ protein_attributes_to_group = [
 ]
 
 
+@dataclass
+class AttributeRuleBase(_AttributeHelperBase):
+    def is_applicable(
+        self,
+        attributes: Dict[str, Any],
+        spectrum: Spectrum,
+        analyte: Analyte,
+        interpretation: Interpretation,
+        interpretation_member: InterpretationMember,
+    ) -> bool:
+        raise NotImplementedError()
+
+    def process_attributes(
+        self,
+        attributes: Dict[str, Any],
+        spectrum: Spectrum,
+        analyte: Analyte,
+        interpretation: Interpretation,
+        interpretation_member: InterpretationMember,
+    ) -> List[str]:
+        raise NotImplementedError()
+
+
+class StrippedPeptideParserRule(AttributeRuleBase):
+    def is_applicable(
+        self,
+        attributes: Dict[str, Any],
+        spectrum: Spectrum,
+        analyte: Analyte,
+        interpretation: Interpretation,
+        interpretation_member: InterpretationMember,
+    ) -> bool:
+        return not analyte.has_attribute(STRIPPED_PEPTIDE_TERM) and spectrum.has_attribute(SPECTRUM_NAME)
+
+    def process_attributes(
+        self,
+        attributes: Dict[str, Any],
+        spectrum: Spectrum,
+        analyte: Analyte,
+        interpretation: Interpretation,
+        interpretation_member: InterpretationMember,
+    ) -> List[str]:
+        name = spectrum.get_attribute(SPECTRUM_NAME)
+        if name:
+            match = re.match(r"([ARNDCEQGHKMFPSTWYVIL]+)/(\d+)", name)
+            if match:
+                self.add_value(STRIPPED_PEPTIDE_TERM, match.group(1), analyte)
+                self.add_value("MS:1000041|charge state", try_cast(match.group(2)), analyte)
+        []
+
+
+@dataclass
+class FullNameParsingRule(AttributeRuleBase):
+    attribute: str = "Fullname"
+
+    def is_applicable(
+        self,
+        attributes: Dict[str, Any],
+        spectrum: Spectrum,
+        analyte: Analyte,
+        interpretation: Interpretation,
+        interpretation_member: InterpretationMember,
+    ) -> bool:
+        return self.attribute in attributes
+
+    def parse_value(self, value: str):
+        match = re.match(
+            r"([A-Z\-\*])\.([A-Z]+)\.([A-Z\-\*])/*([\d]*)",
+            value,
+        )
+        if match is None:
+            return None
+        peptide = match.group(2)
+        nterm = match.group(1)
+        cterm = match.group(3)
+        charge = match.group(4)
+        return peptide, nterm, cterm, charge
+
+    def process_attributes(
+        self,
+        attributes: Dict[str, Any],
+        spectrum: Spectrum,
+        analyte: Analyte,
+        interpretation: Interpretation,
+        interpretation_member: InterpretationMember,
+    ) -> List[str]:
+        value = attributes[self.attribute]
+        unknown_terms = []
+        if value is not None:
+            match = self.parse_value(value)
+            if match is not None:
+                (peptide, nterm, cterm, charge) = match
+                analyte.add_attribute("MS:1000888|stripped peptide sequence", peptide)
+                analyte.add_attribute("MS:1001112|n-terminal flanking residue", nterm)
+                analyte.add_attribute("MS:1001113|c-terminal flanking residue", cterm)
+                if charge:
+                    analyte.add_attribute("MS:1000041|charge state", try_cast(charge))
+                attributes.pop(self.attribute)
+            else:
+                unknown_terms.append(self.attribute)
+        else:
+            unknown_terms.append(self.attribute)
+        return unknown_terms
+
+@dataclass
+class PeptideNotationUnpackingRule(AttributeRuleBase):
+    modification_parser: ModificationParser
+
+    def is_applicable(
+        self,
+        attributes: Dict[str, Any],
+        spectrum: Spectrum,
+        analyte: Analyte,
+        interpretation: Interpretation,
+        interpretation_member: InterpretationMember,
+    ) -> bool:
+        return bool(analyte.attributes)
+
+    def process_attributes(
+        self,
+        attributes: Dict[str, Any],
+        spectrum: Spectrum,
+        analyte: Analyte,
+        interpretation: Interpretation,
+        interpretation_member: InterpretationMember,
+    ) -> List[str]:
+        self.complete_analyte(analyte)
+        return []
+
+    def complete_analyte(self, analyte: Analyte):
+        if analyte.has_attribute(STRIPPED_PEPTIDE_TERM):
+            peptide = proforma.ProForma.parse(analyte.get_attribute(STRIPPED_PEPTIDE_TERM))
+            if analyte.has_attribute(PEPTIDE_MODIFICATION_TERM):
+                modification_details = analyte.get_attribute(PEPTIDE_MODIFICATION_TERM)
+                mods = self.modification_parser(modification_details)
+                for position, residue, mod in mods:
+                    if position == 0 and mod in TERMINAL_MODIFICATIONS:
+                        peptide.n_term = [proforma.GenericModification(mod)]
+                    else:
+                        seqpos = list(peptide.sequence[position])
+                        if not seqpos[1]:
+                            seqpos[1] = [proforma.GenericModification(mod)]
+                        peptide.sequence[position] = tuple(seqpos)
+                        assert seqpos[0] == residue
+            analyte.add_attribute("MS:1003169|proforma peptidoform sequence", str(peptide))
+            if analyte.has_attribute(PEPTIDE_MODIFICATION_TERM):
+                analyte.remove_attribute(PEPTIDE_MODIFICATION_TERM)
+            analyte.add_attribute("MS:1001117|theoretical mass", peptide.mass)
+
+        self.pack_protein_description(analyte)
+
+        self.deduplicate_attribute(analyte, "MS:1000224|molecular mass")
+        self.deduplicate_attribute(analyte, "MS:1000866|molecular formula")
+
+    def pack_protein_description(self, analyte: Analyte):
+        table = {}
+        max_len = 0
+
+        # Collect terms that describe a protein
+        for term in protein_attributes_to_group:
+            if not analyte.has_attribute(term):
+                table[term] = []
+                continue
+            values = analyte.get_attribute(term, raw=True)
+            if not isinstance(values, list):
+                values = [values]
+            max_len = max(max_len, len(values))
+            table[term] = values
+
+        # Ensure that all arrays are the same length
+        for k, v in table.items():
+            if len(v) < max_len:
+                v.extend([None] * (max_len - len(v)))
+
+        # Group together terms and remove the previous entries
+        groups = []
+        for i in range(max_len):
+            group = []
+            for k, v in table.items():
+                if v[i] is None:
+                    continue
+                group.append((k, v[i].value))
+                try:
+                    analyte.remove_attribute(v[i].key, v[i].group_id)
+                except KeyError:
+                    # Sometimes, there are multiple entries for the same attribute,
+                    # some with a group ID, some without. If an entry without a group
+                    # ID is removed, every entry is removed, and subsequent removals
+                    # do not find the entry.
+                    pass
+            groups.append(group)
+
+        # Now add back the groups
+        for group in groups:
+            analyte.add_attribute_group(group)
+
+
+@dataclass
+class AttributeRulesEngine:
+    other_manager: AttributeHandler
+    analyte_manager: AttributeHandler
+    interpretation_manager: AttributeHandler
+    interpretation_member_manager: AttributeHandler
+    spectrum_attribute_handler: AttributeHandler
+    analyte_attribute_handler: AttributeHandler
+
+    early_rules: List[AttributeRuleBase] = field(default_factory=list)
+    late_rules: List[AttributeRuleBase] = field(default_factory=list)
+
+    def process_attributes(
+        self,
+        attributes: Dict[str, Any],
+        spectrum: Spectrum,
+        analyte: Analyte,
+        interpretation: Interpretation,
+        interpretation_member: InterpretationMember,
+    ):
+        unknown_terms = []
+
+        for early_rule in self.early_rules:
+            if early_rule.is_applicable(attributes, spectrum, analyte, interpretation, interpretation_member):
+                early_rule.process_attributes(attributes, spectrum, analyte, interpretation, interpretation_member)
+
+        for attribute in attributes:
+            # Skip a leader term that we already processed
+            if attribute in leader_terms:
+                continue
+            if not attribute:
+                continue
+            if attribute in self.other_manager:
+                if not self.other_manager(attribute, attributes[attribute], spectrum):
+                    unknown_terms.append(attribute)
+
+            elif attribute in self.analyte_manager:
+                if not self.analyte_manager(attribute, attributes[attribute], analyte):
+                    unknown_terms.append(attribute)
+
+            elif attribute in self.interpretation_manager:
+                if not self.interpretation_manager(attribute, attributes[attribute], interpretation):
+                    unknown_terms.append(attribute)
+
+            elif attribute in self.interpretation_member_manager:
+                if not self.interpretation_member_manager(attribute, attributes[attribute], interpretation_member):
+                    unknown_terms.append(attribute)
+
+            elif attribute in self.spectrum_attribute_handler:
+                if not self.spectrum_attribute_handler(attribute, attributes[attribute], spectrum):
+                    unknown_terms.append(attribute)
+
+            elif attribute in self.analyte_attribute_handler:
+                if not self.analyte_attribute_handler(attribute, attributes[attribute], analyte):
+                    unknown_terms.append(attribute)
+            else:
+                unknown_terms.append(attribute)
+
+        for late_rule in self.late_rules:
+            if late_rule.is_applicable(attributes, spectrum, analyte, interpretation, interpretation_member):
+                late_rule.process_attributes(attributes, spectrum, analyte, interpretation, interpretation_member)
+
+        return unknown_terms
+
+
 def proportion_parser(aggregation: str) -> float:
     """Parse for fractions or percentages"""
-    if '/' in aggregation:
+    if "/" in aggregation:
         aggregation: Fraction = Fraction(aggregation)
         return float(aggregation)
     else:
@@ -909,15 +1359,21 @@ class PeakAggregationParser:
 
     Attributes
     ----------
-    peak_attributes : list[:class:`~.Attribute`]
+    peak_attributes : list[(:class:`~.Attribute`, :class:`PeakAggregateParseFn`)]
         The attributes this parser expects
     """
 
-    peak_attributes: List[Tuple[Attribute, PeakAggregateParseFn]] = field(default_factory=lambda: [Attribute(PEAK_ATTRIB, PEAK_OBSERVATION_FREQ)])
+    peak_attributes: List[Tuple[Attribute, PeakAggregateParseFn]] = field(
+        default_factory=lambda: [(Attribute(PEAK_ATTRIB, PEAK_OBSERVATION_FREQ), proportion_parser)]
+    )
 
-    def __call__(self, aggregation: str, wrap_errors: bool=True, **kwargs) -> List[Tuple[Attribute, float]]:
+    def __call__(self, aggregation: str, wrap_errors: bool = True, **kwargs) -> List[Tuple[Attribute, float]]:
         parsed = []
-        for i, (k, parser), token in enumerate(SPACE_SPLITTER.split(aggregation)):
+
+        if isinstance(aggregation, str):
+            aggregation = SPACE_SPLITTER.split(aggregation)
+
+        for (i, token), (k, parser) in zip(enumerate(aggregation), self.peak_attributes):
             try:
                 result = parser(token)
                 parsed.append((k, result))
@@ -927,6 +1383,7 @@ class PeakAggregationParser:
                 else:
                     logger.error(f"Failed to parse aggregation at {i}")
                     parsed.append((k, token))
+        return parsed
 
 
 @dataclass
@@ -937,12 +1394,15 @@ class PeakParsingStrategy:
 
     Attributes
     ----------
-    annotation_parser : :class:`MSPAnnotationStringParser`
-        The peak annotation parser
+    annotation_parser : :class:`MSPAnnotationStringParser` or :const:`None`
+        The peak annotation parser for this format.
+
+    aggregation_parser : :class:`PeakAggregationParser` or :const:`None`
+        The peak aggregation parser for this format
     """
 
-    annotation_parser: Optional[MSPAnnotationStringParser] = None
-    aggregation_parser: Optional[PeakAggregationParser] = None
+    annotation_parser: Optional[MSPAnnotationStringParser] = field(default=parse_annotation)
+    aggregation_parser: Optional[PeakAggregationParser] = field(default_factory=PeakAggregationParser)
 
     def has_aggregation(self) -> bool:
         return self.aggregation_parser is not None
@@ -950,16 +1410,55 @@ class PeakParsingStrategy:
     def has_annotation(self) -> bool:
         return self.annotation_parser is not None
 
-    def parse_aggregation(self, aggregation: str, wrap_errors: bool=True, **kwargs):
+    def parse_aggregation(self, aggregation: str, wrap_errors: bool = True, **kwargs):
         return self.aggregation_parser(aggregation=aggregation, wrap_errors=wrap_errors, **kwargs)
 
-    def parse_annotation(self, annotation: str, wrap_errors: bool=True, **kwargs):
+    def parse_annotation(self, annotation: str, wrap_errors: bool = True, **kwargs):
         return self.annotation_parser(annotation_string=annotation, wrap_errors=wrap_errors, **kwargs)
 
-    def parse_peak_annotations(self, peal_list: List[RawPeakLine]):
-        pass
+    def process_peak_list(self, spectrum: Spectrum):
+        aggregation_metrics_used = DefaultDict(int)
+        for i, peak in enumerate(spectrum.peak_list):
+            try:
+                parsed_interpretation = self.parse_annotation(peak[2], spectrum=spectrum)
+            except ValueError as err:
+                message = str(err)
+                raise ValueError(
+                    f"An error occurred while parsing the peak annotation for peak {i}: {message}"
+                ) from err
 
-    def parse_peak_list(self, peak_lines: List[str]) -> List[RawPeakLine]:
+            if parsed_interpretation and isinstance(parsed_interpretation[0], annotation.InvalidAnnotation) and peak[3]:
+                logger.debug(
+                    "Failed to parse interpretation string %r with assumed %d aggregation fields, trying to parse the combined string",
+                    peak[2],
+                    len(peak[3]),
+                )
+
+                peak[2] = " ".join([peak[2]] + peak[3])
+                peak[3] = []
+                try:
+                    parsed_interpretation = self.parse_annotation(peak[2], spectrum=spectrum)
+                except ValueError as err:
+                    message = str(err)
+                    raise ValueError(
+                        f"An error occurred while parsing the peak annotation for peak {i}: {message}"
+                    ) from err
+
+            peak[2] = parsed_interpretation
+            if peak[3]:
+                aggregations = []
+                for agg_type, agg in self.parse_aggregation(peak[3]):
+                    aggregation_metrics_used[agg_type] += 1
+                    aggregations.append(agg)
+
+                peak[3] = aggregations
+
+        aggregation_metrics = [metric for metric, count in aggregation_metrics_used.items() if count > 0]
+
+        if aggregation_metrics:
+            spectrum.add_attribute_group(aggregation_metrics)
+
+    def parse_peak_list(self, peak_lines: Iterable[str]) -> List[RawPeakLine]:
         peak_list = []
         for values in peak_lines:
             interpretations = ""
@@ -995,6 +1494,10 @@ class PeakParsingStrategy:
             peak_list.append([float(mz), float(intensity), interpretations, aggregation])
         return peak_list
 
+    def __call__(self, peak_lines: Iterable[str]) -> list:
+        raw_peaks = self.parse_peak_list(peak_lines)
+        return raw_peaks
+
 
 class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
     """
@@ -1007,8 +1510,7 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
     is neither exhaustive nor nuanced enough to know from context
     exactly what those files' authors intended, making a best guess
     at when they correspond to in the controlled vocabulary mapping
-    for :mod:`mzlib`
-
+    for :mod:`mzspeclib`
 
     Attributes
     ----------
@@ -1025,14 +1527,14 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
     modification_parser: ModificationParser
     unknown_attributes: _UnknownTermTracker
 
-    def __init__(self, filename, index_type=None, read_metadata=True, create_index: bool=True):
+    def __init__(self, filename, index_type=None, read_metadata=True, create_index: bool = True):
         super().__init__(filename, index_type, read_metadata, create_index=create_index)
         self.modification_parser = ModificationParser()
         self.unknown_attributes = UnknownKeyTracker()
 
     @classmethod
     def guess_from_header(cls, filename: str) -> bool:
-        with open_stream(filename, 'r') as stream:
+        with open_stream(filename, "r") as stream:
             first_line = stream.readline()
             if LEADER_TERMS_PATTERN.match(first_line):
                 return True
@@ -1042,7 +1544,7 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
         filename = self.filename
         file_like_object = isinstance(filename, io.IOBase)
 
-        stream = open_stream(filename, 'rt')
+        stream = open_stream(filename, "rt")
         match, offset = self._parse_header_from_stream(stream)
         if file_like_object:
             if stream.seekable():
@@ -1055,13 +1557,13 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
     def _parse_header_from_stream(self, stream: io.IOBase) -> Tuple[bool, int]:
         first_line = stream.readline()
         if isinstance(first_line, bytes):
-            first_line = first_line.decode('utf8')
+            first_line = first_line.decode("utf8")
         attributes = AttributeManager()
         attributes.add_attribute(FORMAT_VERSION_TERM, DEFAULT_VERSION)
         if isinstance(self.filename, (str, os.PathLike)):
-            attributes.add_attribute(LIBRARY_NAME_TERM, self.filename.rsplit('.msp', 1)[0].split(os.sep)[-1])
-        elif hasattr(stream, 'name'):
-            attributes.add_attribute(LIBRARY_NAME_TERM, stream.name.rsplit('.msp', 1)[0].split(os.sep)[-1])
+            attributes.add_attribute(LIBRARY_NAME_TERM, self.filename.rsplit(".msp", 1)[0].split(os.sep)[-1])
+        elif hasattr(stream, "name"):
+            attributes.add_attribute(LIBRARY_NAME_TERM, stream.name.rsplit(".msp", 1)[0].split(os.sep)[-1])
         self.attributes.clear()
         self.attributes._from_iterable(attributes)
         if LEADER_TERMS_PATTERN.match(first_line):
@@ -1093,16 +1595,16 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
                     filename.seek(0, os.SEEK_END)
                     file_size = filename.tell()
                     filename.seek(0)
-        infile = open_stream(filename, 'r')
+        infile = open_stream(filename, "r")
 
-        state = 'header'
+        state = "header"
         spectrum_buffer = []
         n_spectra = 0
         start_index = 0
         file_offset = 0
         line_beginning_file_offset = 0
         spectrum_file_offset = 0
-        spectrum_name = ''
+        spectrum_name = ""
 
         # Required for counting file_offset manually (LF vs CRLF)
         infile.readline()
@@ -1125,13 +1627,13 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
 
             line = line.rstrip()
             # TODO: Name: could be Compound or SpectrumName
-            if state == 'header':
+            if state == "header":
                 if LEADER_TERMS_PATTERN.match(line):
-                    state = 'body'
+                    state = "body"
                     spectrum_file_offset = line_beginning_file_offset
                 else:
                     continue
-            if state == 'body':
+            if state == "body":
                 if len(line) == 0:
                     continue
                 if LEADER_TERMS_PATTERN.match(line):
@@ -1140,7 +1642,8 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
                             number=n_spectra + start_index,
                             offset=spectrum_file_offset,
                             name=spectrum_name,
-                            analyte=None)
+                            analyte=None,
+                        )
                         n_spectra += 1
                         spectrum_buffer = []
                         #### Commit every now and then
@@ -1157,7 +1660,8 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
             number=n_spectra + start_index,
             offset=spectrum_file_offset,
             name=spectrum_name,
-            analyte=None)
+            analyte=None,
+        )
         self.index.commit()
         n_spectra += 1
 
@@ -1173,7 +1677,7 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
         return n_spectra
 
     def _buffer_from_stream(self, infile: Iterable[str]) -> List[str]:
-        state = 'body'
+        state = "body"
         spectrum_buffer = []
 
         file_offset = 0
@@ -1182,7 +1686,7 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
             line_beginning_file_offset = file_offset
             file_offset += len(line)
             line = line.rstrip()
-            if state == 'body':
+            if state == "body":
                 if len(line) == 0:
                     continue
                 if LEADER_TERMS_PATTERN.match(line):
@@ -1191,25 +1695,25 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
                 spectrum_buffer.append(line)
         return spectrum_buffer
 
-    def _parse(self, buffer: Iterable[str], spectrum_index: int=None) -> Spectrum:
+    def _make_peak_parsing_strategy(self) -> PeakParsingStrategy:
+        return PeakParsingStrategy(parse_annotation)
 
+    def _parse(self, buffer: Iterable[str], spectrum_index: int = None) -> Spectrum:
         #### Start in the header section of the entry
         in_header = True
 
         #### Reset all spectrum properties in case there is already data here
         attributes = {}
         peak_list = []
+        peak_line_parser: PeakParsingStrategy = self._make_peak_parsing_strategy()
 
         #### Loop through each line in the buffered list
         for line in buffer:
-
-            #print(line)
-
             #### If in the the header portion of the entry
             if in_header:
-
+                key = value = None
                 #### Extract the key,value pair by splitting on the *first* colon with optional whitespace
-                match = re.match(r"\s*#", line)
+                match = re.match(r"\s*#", line)  # Assume lines starting with # are comments
                 if match:
                     continue
                 elif line.count(":") > 0:
@@ -1223,9 +1727,7 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
                     in_header = False
                 else:
                     key = line
-                    value = None
                     attributes[key] = value
-
 
                 #### If the key is "Num peaks" then we're done with the header and peak list follows
                 if key in NUM_PEAKS_KEYS:
@@ -1233,7 +1735,6 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
 
                 #### The "Comment" key requires special parsing
                 if key == "Comment" or key == "Comments":
-
                     #### Remove it from attributes
                     del attributes[key]
                     self._parse_comment(value, attributes)
@@ -1241,7 +1742,7 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
             #### Else in the peaks section. Parse the peaks.
             else:
                 #### Split into the expected three values
-                values = re.split(r'\s+', line, maxsplit=2)
+                values = re.split(r"\s+", line, maxsplit=2)
                 # Sometimes MSP files have multiple peaks on the same line, delimited by ';',
                 # so we must potentially parse more than one peak per line.
                 if values[1].endswith(";"):
@@ -1251,42 +1752,12 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
                     rest = values[0]
                     for block in re.split(r";\s?", rest):
                         if block:
-                            buffered_peaks.append(re.split(r'\s+', block, maxsplit=2))
-
+                            buffered_peaks.append(re.split(r"\s+", block, maxsplit=2))
+                    peak_list.extend(buffered_peaks)
                 else:
-                    buffered_peaks = [values]
+                    peak_list.append(values)
 
-                for values in buffered_peaks:
-                    interpretations = ""
-                    aggregation = ""
-                    if len(values) == 1:
-                        mz = values
-                        intensity = "1"
-                    if len(values) == 2:
-                        mz, intensity = values
-                    elif len(values) == 3:
-                        mz, intensity, interpretations = values
-                    elif len(values) > 3:
-                        mz, intensity, interpretations = values[0:2]
-                    else:
-                        mz = "1"
-                        intensity = "1"
-
-                    interpretations = interpretations.strip('"')
-                    if interpretations.startswith("?"):
-                        parts = re.split(r"\s+", interpretations)
-                        if len(parts) > 1:
-                            # Some msp files have a concept for ?i, but this requires a definition
-                            interpretations = "?"
-                            aggregation = parts[1:]
-                    else:
-                        if " " in interpretations:
-                            parts = re.split(r"\s+", interpretations)
-                            interpretations = parts[0]
-                            aggregation = parts[1:]
-
-                    #### Add to the peak list
-                    peak_list.append([float(mz), float(intensity), interpretations, aggregation])
+        peak_list = peak_line_parser(peak_list)
 
         #### Now convert the format attributes to standard ones
         spectrum = self._make_spectrum(peak_list, attributes)
@@ -1295,53 +1766,10 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
         else:
             spectrum.index = -1
         spectrum.key = spectrum.index + 1
-        has_observation_freq = (False, 0)
-        for i, peak in enumerate(spectrum.peak_list):
-            try:
-                parsed_interpretation = self._parse_annotation(peak[2], spectrum=spectrum)
-            except ValueError as err:
-                message = str(err)
-                raise ValueError(
-                    f"An error occurred while parsing the peak annotation for peak {i}: {message}") from err
-
-            if parsed_interpretation and isinstance(parsed_interpretation[0], annotation.InvalidAnnotation) and peak[3]:
-                logger.debug("Failed to parse interpretation string %r with assumed %d aggregation fields, trying to parse the combined string",
-                             peak[2], len(peak[3]))
-
-                peak[2] = " ".join([peak[2]] + peak[3])
-                peak[3] = []
-                try:
-                    parsed_interpretation = self._parse_annotation(peak[2], spectrum=spectrum)
-                except ValueError as err:
-                    message = str(err)
-                    raise ValueError(
-                        f"An error occurred while parsing the peak annotation for peak {i}: {message}") from err
-
-            peak[2] = parsed_interpretation
-            for i, agg in enumerate(peak[3]):
-                # NOTE: Making the potentially unsafe assumption that the only fractional
-                # aggregation statistic is the peak frequency. At this time, we haven't formalized
-                # any other aggregation metric that I also have an MSP example for.
-                if '/' in agg:
-                    try:
-                        agg = _parse_fraction(agg)
-                        peak[3][i] = agg
-                        has_observation_freq = (True, i)
-                    except ValueError:
-                        pass
-                    except Exception as err:
-                        raise ValueError(f"An error occurred while parsing the peak aggregation for peak {i}: {str(err)}") from err
-
-        aggregation_metrics = []
-        if has_observation_freq[0]:
-            aggregation_metrics.append((PEAK_ATTRIB, PEAK_OBSERVATION_FREQ))
-
-        if aggregation_metrics:
-            spectrum.add_attribute_group(aggregation_metrics)
-
+        peak_line_parser.process_peak_list(spectrum)
         return spectrum
 
-    def _parse_annotation(self, annotation: str, wrap_errors: bool=True, **kwargs):
+    def _parse_annotation(self, annotation: str, wrap_errors: bool = True, **kwargs):
         return parse_annotation(annotation_string=annotation, wrap_errors=wrap_errors, **kwargs)
 
     def _parse_comment(self, value: str, attributes: Attributed):
@@ -1374,7 +1802,7 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
             else:
                 attributes[item] = None
 
-    def _make_attribute_handlers(self):
+    def _make_attribute_handlers(self) -> AttributeRulesEngine:
         """
         Create the attribute handling scopes that map this flavor of MSP's
         attributes onto controlled vocabulary terms in context.
@@ -1408,125 +1836,65 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
         analyte_manager = MappingAttributeHandler(analyte_terms)
         interpretation_manager = MappingAttributeHandler(interpretation_terms)
         interpretation_member_manager = MappingAttributeHandler(interpretation_member_terms)
-        return (other_manager,
-                analyte_manager,
-                interpretation_manager,
-                interpretation_member_manager,
-                msp_spectrum_attribute_handler,
-                msp_analyte_attribute_handler)
+
+        return AttributeRulesEngine(
+            other_manager,
+            analyte_manager,
+            interpretation_manager,
+            interpretation_member_manager,
+            msp_spectrum_attribute_handler,
+            msp_analyte_attribute_handler,
+            early_rules=[FullNameParsingRule()],
+            late_rules=[StrippedPeptideParserRule(), PeptideNotationUnpackingRule(self.modification_parser)],
+        )
 
     def _make_spectrum(self, peak_list: List, attributes: Mapping[str, str]):
         spectrum = self._new_spectrum()
         interpretation = self._new_interpretation(FIRST_INTERPRETATION_KEY)
-        interpretation_member = None
+        interpretation_member = self._new_interpretation_member(1)
         analyte = self._new_analyte(FIRST_ANALYTE_KEY)
+
+        # Assume MSP spectra always have an Analyte, we can remove it later.
+        # It is less common to assume that they will have Interpretation
+        # or InterpretationMember component, so we will add these only if
+        # we find attributes for them
         spectrum.add_analyte(analyte)
-        # interpretation.add_analyte(analyte)
         spectrum.peak_list = peak_list
-        # spectrum.interpretations.add_interpretation(interpretation)
 
         #### Add special terms that we want to start off with
         for term in leader_terms:
             if term in attributes:
-                spectrum.add_attribute(
-                    leader_terms[term], try_cast(attributes[term]))
+                spectrum.add_attribute(leader_terms[term], try_cast(attributes[term]))
                 break
         else:
-            spectrum.add_attribute(
-                "ERROR", f"Required term {leader_terms[term]} is missing")
+            logger.error("Did not find any MSP leader terms (%s) for Spectrum Index = %s", leader_terms, spectrum.index)
 
         #### Translate the rest of the known attributes and collect unknown ones
-        unknown_terms = []
-
-        (other_manager, analyte_manager, interpretation_manager, interpretation_member_manager,
-         spectrum_func_handler, analyte_func_handler) = self._make_attribute_handlers()
-        for attribute in attributes:
-
-            #### Skip a leader term that we already processed
-            if attribute in leader_terms:
-                continue
-            if not attribute:
-                continue
-            if attribute in other_manager:
-                if not other_manager(attribute, attributes[attribute], spectrum):
-                    unknown_terms.append(attribute)
-
-            elif attribute in analyte_manager:
-                if not analyte_manager(attribute, attributes[attribute], analyte):
-                    unknown_terms.append(attribute)
-
-            elif attribute in interpretation_manager:
-                if not interpretation_manager(attribute, attributes[attribute], interpretation):
-                    unknown_terms.append(attribute)
-
-            elif attribute in interpretation_member_manager:
-                if interpretation_member is None:
-                    interpretation_member = self._new_interpretation_member(1)
-                    interpretation.add_member_interpretation(interpretation_member)
-                if not interpretation_member_manager(attribute, attributes[attribute], interpretation_member):
-                    unknown_terms.append(attribute)
-
-            elif attribute in spectrum_func_handler:
-                if not spectrum_func_handler(attribute, attributes[attribute], spectrum):
-                    unknown_terms.append(attribute)
-
-            elif attribute in analyte_func_handler:
-                if not analyte_func_handler(attribute, attributes[attribute], analyte):
-                    unknown_terms.append(attribute)
-
-            #### Expand the Fullname attribute
-            elif attribute == "Fullname":
-                if attributes[attribute] is not None:
-                    match = re.match(
-                        r"([A-Z\-\*])\.([A-Z]+)\.([A-Z\-\*])/*([\d]*)", attributes[attribute])
-                    if match is not None:
-                        analyte.add_attribute(
-                            "MS:1000888|stripped peptide sequence", match.group(2))
-                        analyte.add_attribute(
-                            "MS:1001112|n-terminal flanking residue", match.group(1))
-                        analyte.add_attribute(
-                            "MS:1001113|c-terminal flanking residue", match.group(3))
-                        if match.group(4):
-                            analyte.add_attribute(
-                                "MS:1000041|charge state", try_cast(match.group(4)))
-                    else:
-                        spectrum.add_attribute(
-                            "ERROR", f"Unable to parse {attributes[attribute]} in {attribute}")
-                        unknown_terms.append(attribute)
-                else:
-                    spectrum.add_attribute(
-                        "ERROR", f"Attribute {attribute} must have a value")
-                    unknown_terms.append(attribute)
-
-            #### Otherwise add this term to the list of attributes that we don't know how to handle
-            else:
-                unknown_terms.append(attribute)
-
-        if not analyte.has_attribute(STRIPPED_PEPTIDE_TERM):
-            if spectrum.has_attribute(SPECTRUM_NAME):
-                name = spectrum.get_attribute(SPECTRUM_NAME)
-                if name:
-                    match = re.match(r"([ARNDCEQGHKMFPSTWYVIL]+)/(\d+)", name)
-                    if match:
-                        analyte.add_attribute(
-                            STRIPPED_PEPTIDE_TERM, match.group(1))
-                        analyte.add_attribute(
-                            "MS:1000041|charge state", try_cast(match.group(2)))
+        attribute_rules = self._make_attribute_handlers()
+        unknown_terms = attribute_rules.process_attributes(
+            attributes, spectrum, analyte, interpretation, interpretation_member
+        )
 
         #### Handle the uninterpretable terms
         for attribute in unknown_terms:
             self.unknown_attributes.add(attribute, attributes[attribute])
             if attributes[attribute] is None:
-                spectrum.add_attribute(
-                    "MS:1003275|other attribute name", try_cast(attribute))
+                spectrum.add_attribute("MS:1003275|other attribute name", try_cast(attribute))
             else:
                 group_identifier = spectrum.get_next_group_identifier()
                 spectrum.add_attribute(
-                    "MS:1003275|other attribute name", try_cast(attribute), group_identifier)
-                spectrum.add_attribute("MS:1003276|other attribute value",
-                                   try_cast(attributes[attribute]), group_identifier)
+                    "MS:1003275|other attribute name",
+                    try_cast(attribute),
+                    group_identifier,
+                )
+                spectrum.add_attribute(
+                    "MS:1003276|other attribute value",
+                    try_cast(attributes[attribute]),
+                    group_identifier,
+                )
 
-        self._complete_analyte(analyte)
+        if interpretation_member:
+            interpretation.add_member_interpretation(interpretation_member)
 
         if not self._is_analyte_defined(analyte):
             self._hoist_analyte_attributes_on_rejection(analyte, spectrum)
@@ -1538,87 +1906,7 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
             spectrum.add_interpretation(interpretation)
         return spectrum
 
-    def _deduplicate_attr(self, container: Attributed, attribute_name: str) -> int:
-        try:
-            attrs = container.get_attribute(attribute_name, raw=True)
-        except KeyError:
-            return 0
-        if isinstance(attrs, list):
-            # Sometimes there are multiple entries that map to molecular mass, and one is the nominal
-            # mass. Prefer listing the most precise mass first. Apply the same logic to all attributes.
-            attrs.sort(key=lambda x: len(str(x.value)), reverse=True)
-            container.remove_attribute(attrs[0].key)
-            seen_values = set()
-            for attr in attrs:
-                key = (attr.value, attr.group_id)
-                if key in seen_values:
-                    continue
-                seen_values.add(key)
-                container.add_attribute(attr.key, attr.value, attr.group_id)
-            return len(attrs) - len(seen_values)
-        return 0
-
-    def _complete_analyte(self, analyte: Analyte):
-        if analyte.has_attribute(STRIPPED_PEPTIDE_TERM):
-            peptide = proforma.ProForma.parse(analyte.get_attribute(STRIPPED_PEPTIDE_TERM))
-            if analyte.has_attribute(PEPTIDE_MODIFICATION_TERM):
-                modification_details = analyte.get_attribute(PEPTIDE_MODIFICATION_TERM)
-                mods = self.modification_parser(modification_details)
-                for position, residue, mod in mods:
-                    if position == 0 and mod in TERMINAL_MODIFICATIONS:
-                        peptide.n_term = [proforma.GenericModification(mod)]
-                    else:
-                        seqpos = list(peptide.sequence[position])
-                        if not seqpos[1]:
-                            seqpos[1] = [proforma.GenericModification(mod)]
-                        peptide.sequence[position] = tuple(seqpos)
-                        assert seqpos[0] == residue
-            analyte.add_attribute("MS:1003169|proforma peptidoform sequence", str(peptide))
-            if analyte.has_attribute(PEPTIDE_MODIFICATION_TERM):
-                analyte.remove_attribute(PEPTIDE_MODIFICATION_TERM)
-            analyte.add_attribute("MS:1001117|theoretical mass", peptide.mass)
-
-        self._pack_protein_description(analyte)
-
-        self._deduplicate_attr(analyte, "MS:1000224|molecular mass")
-        self._deduplicate_attr(analyte, "MS:1000866|molecular formula")
-
-    def _pack_protein_description(self, analyte: Analyte):
-        table = {}
-        max_len = 0
-
-        # Collect terms that describe a protein
-        for term in protein_attributes_to_group:
-            if not analyte.has_attribute(term):
-                table[term] = []
-                continue
-            values = analyte.get_attribute(term, raw=True)
-            if not isinstance(values, list):
-                values = [values]
-            max_len = max(max_len, len(values))
-            table[term] = values
-
-        # Ensure that all arrays are the same length
-        for k, v in table.items():
-            if len(v) < max_len:
-                v.extend([None] * (max_len - len(v)))
-
-        # Group together terms and remove the previous entries
-        groups = []
-        for i in range(max_len):
-            group = []
-            for k, v in table.items():
-                if v[i] is None:
-                    continue
-                group.append((k, v[i].value))
-                analyte.remove_attribute(v[i].key, v[i].group_id)
-            groups.append(group)
-
-        # Now add back the groups
-        for group in groups:
-            analyte.add_attribute_group(group)
-
-    def get_spectrum(self, spectrum_number: int=None, spectrum_name: str=None) -> Spectrum:
+    def get_spectrum(self, spectrum_number: int = None, spectrum_name: str = None) -> Spectrum:
         # keep the two branches separate for the possibility that this is not possible with all
         # index schemes.
         if spectrum_number is not None:
@@ -1638,9 +1926,9 @@ class MSPSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
 
     def summarize_parsing_errors(self) -> Dict:
         errors = super().summarize_parsing_errors()
-        errors['unknown attributes'] = DefaultDict(dict)
+        errors["unknown attributes"] = DefaultDict(dict)
         for k, v in self.unknown_attributes.items():
-            errors['unknown attributes'][k] = v
+            errors["unknown attributes"][k] = v
         return errors
 
 
@@ -1671,8 +1959,14 @@ class MSPSpectralLibraryWriter(SpectralLibraryWriterBase):
 
     spectrum_keys = {
         "MS:1000041|charge state": "Charge",
-        ("MS:1003065|spectrum aggregation type", "MS:1003066|singleton spectrum"): "Single",
-        ("MS:1003065|spectrum aggregation type", "MS:1003067|consensus spectrum"): "Consensus",
+        (
+            "MS:1003065|spectrum aggregation type",
+            "MS:1003066|singleton spectrum",
+        ): "Single",
+        (
+            "MS:1003065|spectrum aggregation type",
+            "MS:1003067|consensus spectrum",
+        ): "Consensus",
         "MS:1003057|scan number": "Scan",
         "MS:1003203|constituent spectrum file": "Origfile",
         "MS:1000002|sample name": "Sample",
@@ -1685,8 +1979,14 @@ class MSPSpectralLibraryWriter(SpectralLibraryWriterBase):
         "MS:1003080|top 20 peak unassigned intensity fraction": "Unassigned",
         "MS:1003079|total unassigned intensity fraction": "Unassign_all",
         "MS:1003290|number of unassigned peaks among top 20 peaks": "top_20_num_unassigned_peaks",
-        ("MS:1000044|dissociation method", "MS:1000422|beam-type collision-induced dissociation"): "HCD",
-        ("MS:1000044|dissociation method", "MS:1002472|trap-type collision-induced dissociation"): "CID",
+        (
+            "MS:1000044|dissociation method",
+            "MS:1000422|beam-type collision-induced dissociation",
+        ): "HCD",
+        (
+            "MS:1000044|dissociation method",
+            "MS:1002472|trap-type collision-induced dissociation",
+        ): "CID",
     }
 
     # TODO: add these
@@ -1707,7 +2007,7 @@ class MSPSpectralLibraryWriter(SpectralLibraryWriterBase):
     def _format_value(self, value):
         if isinstance(value, str):
             if not (value.startswith('"') and value.endswith('"')):
-                value = f"\"{value}\""
+                value = f'"{value}"'
         return str(value)
 
     def _proforma_to_mods(self, proforma_seq: str) -> str:
@@ -1723,7 +2023,7 @@ class MSPSpectralLibraryWriter(SpectralLibraryWriterBase):
                 tokens.append(mod_name)
             return f'Mods={len(mods)}({",".join(tokens)})'
         else:
-            return 'Mods=0'
+            return "Mods=0"
 
     def _protein_to_comments(self, analyte: Analyte) -> List[str]:
         acc = []
@@ -1756,8 +2056,9 @@ class MSPSpectralLibraryWriter(SpectralLibraryWriterBase):
                 break
         return acc
 
-    def _build_comments(self, spectrum: Spectrum, attribute_container: Attributed,
-                        rule_map: Dict) -> List[Tuple[str, str]]:
+    def _build_comments(
+        self, spectrum: Spectrum, attribute_container: Attributed, rule_map: Dict
+    ) -> List[Tuple[str, str]]:
         accumulator = []
 
         for attr_name, msp_name in rule_map.items():
@@ -1768,7 +2069,7 @@ class MSPSpectralLibraryWriter(SpectralLibraryWriterBase):
                         if isinstance(msp_name, str):
                             accumulator.append(msp_name)
                         elif isinstance(msp_name, (list, tuple)) and len(msp_name) == 2:
-                            accumulator.append('='.join(msp_name))
+                            accumulator.append("=".join(msp_name))
                         else:
                             raise TypeError(f"Can't infer conversion for {msp_name} given {attr_name}")
             elif attribute_container.has_attribute(attr_name):
@@ -1776,7 +2077,8 @@ class MSPSpectralLibraryWriter(SpectralLibraryWriterBase):
                 if isinstance(value, list):
                     logger.warn(
                         "Spectrum %r contains multiple values for %r, only the first will be saved",
-                        spectrum.name, attr_name
+                        spectrum.name,
+                        attr_name,
                     )
                     accumulator.append(f"{msp_name}={self._format_value(value[0])}")
                 else:
@@ -1786,24 +2088,23 @@ class MSPSpectralLibraryWriter(SpectralLibraryWriterBase):
     def build_spectrum_comments(self, spectrum: Spectrum) -> List[Tuple[str, str]]:
         accumulator = self._build_comments(spectrum, spectrum, self.spectrum_keys)
         if spectrum.analytes:
-            analyte = spectrum.get_analyte('1')
+            analyte = spectrum.get_analyte("1")
             accumulator += self._build_comments(spectrum, analyte, self.analyte_keys)
             if analyte.peptide:
                 accumulator.append(self._proforma_to_mods(analyte.peptide))
             accumulator += self._protein_to_comments(analyte)
         if spectrum.interpretations:
-            interp = spectrum.get_interpretation('1')
-            accumulator += self._build_comments(
-                spectrum, interp, self.interpretation_keys)
+            interp = spectrum.get_interpretation("1")
+            accumulator += self._build_comments(spectrum, interp, self.interpretation_keys)
         return accumulator
 
     def write_spectrum(self, spectrum: Spectrum):
         if len(spectrum.analytes) > 1:
             logger.warning(
                 "Spectrum %r contains multiple analytes, MSP will only contain the first",
-                spectrum.name
+                spectrum.name,
             )
-        analyte = spectrum.get_analyte('1')
+        analyte = spectrum.get_analyte("1")
         self.handle.write(f"Name: {spectrum.name}\n")
         self.handle.write(f"MW: {analyte.mass}\n")
         self.handle.write(f"Comment: {' '.join(self.build_spectrum_comments(spectrum))}\n")
@@ -1822,8 +2123,8 @@ class MSPSpectralLibraryWriter(SpectralLibraryWriterBase):
             return "?"
         if annot.neutral_losses:
             f = annotation.combine_formula(annot.neutral_losses)
-            if f[0] not in ('-', '+'):
-                f = '+' + f
+            if f[0] not in ("-", "+"):
+                f = "+" + f
             parts.append(f)
         if annot.adducts:
             parts.append(f"[{annotation.combine_formula(annot.adducts)}]")
@@ -1831,18 +2132,18 @@ class MSPSpectralLibraryWriter(SpectralLibraryWriterBase):
             parts.append(f"^{annot.charge}")
         if annot.isotope:
             if annot.isotope > 0:
-                parts.append(f'+{annot.isotope}i')
+                parts.append(f"+{annot.isotope}i")
             else:
-                parts.append(f'{annot.isotope}i')
+                parts.append(f"{annot.isotope}i")
         if annot.mass_error:
-            parts.append(f'/{annot.mass_error}')
-        return ''.join(parts)
+            parts.append(f"/{annot.mass_error}")
+        return "".join(parts)
 
     def _write_peaks(self, spectrum: Spectrum):
         self.handle.write(f"Num peaks: {len(spectrum.peak_list)}\n")
         for peak in spectrum.peak_list:
-            annot = self._format_annotation(peak[2][0]) if peak[2] else '?'
-            self.handle.write(f"{peak[0]:0.4f}\t{peak[1]:0.4f}\t\"{annot}\"\n")
+            annot = self._format_annotation(peak[2][0]) if peak[2] else "?"
+            self.handle.write(f'{peak[0]:0.4f}\t{peak[1]:0.4f}\t"{annot}"\n')
 
     def close(self):
         self.handle.close()

@@ -2,6 +2,6 @@
 Python API
 **********
 
-.. automodule:: mzlib
+.. automodule:: mzspeclib
    :members:
    :imported-members:

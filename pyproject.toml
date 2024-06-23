@@ -8,6 +8,8 @@ keywords = [
     "spectral library",
 ]
 
+license.file = "docs/LICENSE.txt"
+
 requires-python = ">= 3.8"
 
 classifiers=[

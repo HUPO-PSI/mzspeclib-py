@@ -42,7 +42,7 @@ def rule_to_table_rows(rule: dict):
             units = ";".join([f"{rel.accession}|{rel.comment}" for rel in term.get("has_units", [])])
             if units:
                 row["has_units"] = units
-            row["notes"] = attr.get("notes")
+            row["attr_notes"] = attr.get("notes")
             if "value" in attr:
                 value_rule = attr["value"]
                 if isinstance(value_rule, str):

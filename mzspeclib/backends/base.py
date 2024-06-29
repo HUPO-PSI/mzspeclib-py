@@ -3,9 +3,10 @@ import io
 import csv
 import enum
 import logging
+import os
 import warnings
 
-from typing import Any, Callable, Dict, Iterable, Union, List, Type, Iterator
+from typing import Any, Callable, Dict, Iterable, Optional, Union, List, Type, Iterator
 from pathlib import Path
 
 
@@ -219,6 +220,17 @@ class SpectralLibraryBackendBase(AttributedEntity, _VocabularyResolverMixin, _Li
         }
 
         super().__init__(None)
+
+    def _infer_lib_name(self) -> Optional[str]:
+        if hasattr(self.filename, "name"):
+            name = self.filename.name.replace(".gz", "").rsplit(".", 1)[0].split(os.sep)[-1]
+        elif isinstance(self.filename, str):
+            name = self.filename.replace(".gz", "").rsplit(".", 1)[0].split(os.sep)[-1]
+        elif isinstance(self.filename, bytes):
+            name = self.filename.decode("utf8").replace(".gz", "").rsplit(".", 1)[0].split(os.sep)[-1]
+        else:
+            name = None
+        return name
 
     def read_header(self) -> bool:
         """

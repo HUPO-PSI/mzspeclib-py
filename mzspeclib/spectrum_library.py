@@ -2,8 +2,8 @@
 import os
 import pathlib
 
-from typing import Optional, Type, List, Union
-from mzspeclib.attributes import AttributeManagedProperty, AttributeManager
+from typing import Any, Optional, Type, List, Union
+from mzspeclib.attributes import Attribute, AttributeManagedProperty, AttributeManager
 from mzspeclib.backends.base import LIBRARY_DESCRIPTION_TERM, LIBRARY_NAME_TERM, LIBRARY_URI_TERM, LIBRARY_VERSION_TERM
 from mzspeclib.cluster import SpectrumCluster
 
@@ -327,10 +327,12 @@ class SpectrumLibrary:
         self._requires_backend()
         return self.backend.add_attribute(key, value, group_identifier=group_identifier)
 
-    def get_attribute(self, key, group_identifier=None):
+    def get_attribute(
+        self, key: str, group_identifier: Optional[str] = None, raw: bool = False
+    ) -> Union[Any, List[Any], Attribute, List[Attribute]]:
         """
         Get the value or values associated with a given
-        attribute key from the library level attribute store.
+        attribute key.
 
         Parameters
         ----------
@@ -338,6 +340,8 @@ class SpectrumLibrary:
             The name of the attribute to retrieve
         group_identifier : str, optional
             The specific group identifier to return from.
+        raw : bool
+            Whether to return the :class:`Attribute` object or unwrap the value
 
         Returns
         -------
@@ -345,7 +349,7 @@ class SpectrumLibrary:
             Returns single or multiple values for the requested attribute.
         """
         self._requires_backend()
-        return self.backend.get_attribute(key, group_identifier=group_identifier)
+        return self.backend.get_attribute(key, group_identifier=group_identifier, raw=raw)
 
     def remove_attribute(self, key, group_identifier=None):
         """

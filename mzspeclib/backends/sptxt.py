@@ -409,20 +409,44 @@ class SPTXTSpectralLibrary(_MSPSpectralLibrary):
         nbytes = 0
         attributes = AttributeManager()
         attributes.add_attribute(FORMAT_VERSION_TERM, DEFAULT_VERSION)
-        attributes.add_attribute(LIBRARY_NAME_TERM, self.filename)
-        self.attributes.clear()
-        self.attributes._from_iterable(attributes)
 
         line = stream.readline()
         nbytes += len(line)
         i = 0
+        header_buffer = []
         while not re.match(b"Name:", line) and i < HEADER_MAX_DEPTH:
+            header_buffer.append(line)
             line = stream.readline()
             nbytes += len(line)
             i += 1
+
+        self._parse_header_into_attributes(header_buffer, attributes)
+        if not attributes.has_attribute(LIBRARY_NAME_TERM):
+            name = self._infer_lib_name()
+            if name:
+                attributes.add_attribute(LIBRARY_NAME_TERM, name)
+
+        self.attributes.clear()
+        self.attributes._from_iterable(attributes)
         if re.match(b"Name:", line):
+            header_buffer.append(line)
+
             return True, nbytes - len(line)
         return False, 0
+
+    def _parse_header_into_attributes(self, lines: List[bytes], attributes: AttributeManager):
+        for i, line in enumerate(lines):
+            if line.startswith(b"###"):
+                if i == 0:
+                    name = line.rsplit(b'(', 1)[0].strip().decode('utf8').strip("# ")
+                    attributes.add_attribute(LIBRARY_NAME_TERM, name)
+                elif i == 1:
+                    version = line.split(b"(", 1)[1].strip().decode("utf8").split(",")[0].split(" ")[1]
+                    gid = attributes.get_next_group_identifier()
+                    attributes.add_attribute("MS:1003207|library creation software", "MS:1001477|SpectraST", gid)
+                    attributes.add_attribute("MS:1003200|software version", version, gid)
+            else:
+                continue
 
     def _make_peak_parsing_strategy(self) -> PeakParsingStrategy:
         return PeakParsingStrategy(parse_annotation)

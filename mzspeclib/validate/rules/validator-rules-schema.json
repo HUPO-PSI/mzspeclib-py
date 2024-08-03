@@ -157,6 +157,10 @@
                 "notes": {
                     "type": "string",
                     "description": "Free text describing the rule applicable to this attribute"
+                },
+                "default_unit": {
+                    "type": "string",
+                    "description": "The default unit to use when none is provided."
                 }
             }
         },

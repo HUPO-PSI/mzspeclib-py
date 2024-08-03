@@ -88,10 +88,11 @@ class ValueOfType(AttributeSemanticPredicate):
         return result
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        state = {
             "name": self.name,
             "type_name": self.type_name
         }
+        return state
 
     @classmethod
     def from_dict(cls, state: Dict[str, Any]) -> 'AttributeSemanticPredicate':
@@ -174,10 +175,11 @@ class ValueMatches(AttributeSemanticPredicate):
         return key == value
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        state = {
             "name": self.name,
             "accession": self.accession
         }
+        return state
 
     @classmethod
     def from_dict(cls, state: Dict[str, Any]) -> 'AttributeSemanticPredicate':
@@ -213,6 +215,7 @@ class AttributeSemanticRule:
     value: Optional[AttributeSemanticPredicate] = dataclasses.field(default=None)
     condition: Optional['AttributeSemanticRule'] = dataclasses.field(default=None)
     notes: Optional[str] = dataclasses.field(default=None)
+    default_unit: Optional[str] = dataclasses.field(default=None)
 
     @property
     def attribute(self) -> str:
@@ -231,6 +234,8 @@ class AttributeSemanticRule:
             state['condition'] = self.condition.to_dict()
         if self.notes:
             state['notes'] = self.notes
+        if self.default_unit is not None:
+            state['default_unit'] = self.default_unit
         return state
 
     @classmethod
@@ -262,7 +267,8 @@ class AttributeSemanticRule:
             allow_children=allow_children,
             value=value_rule,
             condition=condition,
-            notes=state.get('notes')
+            notes=state.get('notes'),
+            default_unit=state.get('default_unit'),
         )
         return attr_rule
 

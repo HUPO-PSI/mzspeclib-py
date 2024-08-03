@@ -2,6 +2,7 @@ import argparse
 import itertools
 import json
 
+import csv
 import xlsxwriter
 
 import psims
@@ -42,6 +43,8 @@ def rule_to_table_rows(rule: dict):
             units = ";".join([f"{rel.accession}|{rel.comment}" for rel in term.get("has_units", [])])
             if units:
                 row["has_units"] = units
+
+            row['default_unit'] = attr.get("default_unit")
             row["attr_notes"] = attr.get("notes")
             if "value" in attr:
                 value_rule = attr["value"]
@@ -54,7 +57,8 @@ def rule_to_table_rows(rule: dict):
                         if k != "name":
                             if value_constraint is not None:
                                 raise ValueError("Too many properties in value rule")
-                            value_constraint = v
+                            else:
+                                value_constraint = v
                     row["value_constraint"] = value_constraint
             if "condition" in attr:
                 condition = attr["condition"]
@@ -112,21 +116,45 @@ def rule_set_to_worksheet(rule_set, sheet, wrap_fmt, default_fmt):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("outpath", help="The name of the XLSX file to write")
+    parser.add_argument("outpath", help="The name of the file to write")
     parser.add_argument("rule_sets", nargs="+", help="The rule set JSON file paths to convert")
+    parser.add_argument("-f", "--format", choices=["xlsx", "csv"])
     args = parser.parse_args()
 
     rule_set_paths = list(filter(lambda x: not x.endswith("rules-schema.json"), args.rule_sets))
 
-    with xlsxwriter.Workbook(args.outpath) as wb:
-        wrap_fmt = wb.add_format({"text_wrap": True, "align": "vcenter"})
-        default_fmt = wb.add_format({"align": "vcenter"})
+    if args.format == 'xlsx':
+        with xlsxwriter.Workbook(args.outpath) as wb:
+            wrap_fmt = wb.add_format({"text_wrap": True, "align": "vcenter"})
+            default_fmt = wb.add_format({"align": "vcenter"})
 
-        for path in rule_set_paths:
-            rule_set = json.load(open(path))
-            name = rule_set["name"]
-            sheet = wb.add_worksheet(name)
-            rule_set_to_worksheet(rule_set, sheet, wrap_fmt, default_fmt)
+            for path in rule_set_paths:
+                rule_set = json.load(open(path))
+                name = rule_set["name"]
+                sheet = wb.add_worksheet(name)
+                rule_set_to_worksheet(rule_set, sheet, wrap_fmt, default_fmt)
+
+    elif args.format == 'csv':
+        with open(args.outpath, 'wt', newline='') as fh:
+            all_rows = []
+            for path in rule_set_paths:
+                rule_set = json.load(open(path))
+                rows = list(itertools.chain.from_iterable(map(rule_to_table_rows, rule_set["rules"])))
+                for row in rows:
+                    row['rule_set_name'] = rule_set['name']
+                    row["link"] = create_issue_link(row)
+                all_rows.extend(rows)
+
+            headers = infer_headers(all_rows)
+            headers.remove("rule_set_name")
+            headers.remove("link")
+            headers = ['rule_set_name'] + headers + ['link']
+            writer = csv.DictWriter(fh, headers)
+            writer.writeheader()
+            writer.writerows(all_rows)
+            fh.flush()
+
+
 
 if __name__ == "__main__":
     main()

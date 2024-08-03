@@ -56,19 +56,20 @@ HEADER_MAX_DEPTH = 1000
 
 class SPTXTAnnotationParser(AnnotationStringParser):
     nominal_loss_to_formula = {
-        "18": "H2O",
-        "17": "NH3",
-        "28": "CO",
-        "34": "N2H6",
-        "35": "NH5O",
-        "36": "H4O2",
-        "44": "CO2",
-        "43": "HNCO",
-        "45": "HCONH2",
-        "46": "HCOOH",
-        "64": "CH4OS",
-        "91": "C2H5NOS",
-        "92": "C2H4O2S",
+        "18": ["H2O"],
+        "17": ["NH3"],
+        "28": ["CO"],
+        "34": ["NH3", "NH3"],
+        "35": ["H2O", "NH3"],
+        "36": ["H2O", "H2O"],
+        "44": ["CO2"],
+        "43": ["HNCO"],
+        "45": ["HCONH2"],
+        "46": ["HCOOH"],
+        "64": ["CH4OS"],
+        "82": ["CH4OS", "H2O"],
+        "91": ["C2H5NOS"],
+        "92": ["C2H4O2S"],
     }
 
     def __init__(self, pattern):
@@ -121,7 +122,7 @@ class SPTXTAnnotationParser(AnnotationStringParser):
             else:
                 sign = '+'
             if loss in self.nominal_loss_to_formula:
-                loss = self.nominal_loss_to_formula[loss]
+                loss = sign.join(self.nominal_loss_to_formula[loss])
             tokens.append(sign)
             tokens.append(loss)
         return ''.join(tokens)

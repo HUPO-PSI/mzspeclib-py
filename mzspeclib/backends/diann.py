@@ -167,11 +167,12 @@ class DIANNTSVSpectralLibrary(_CSVSpectralLibraryBackendBase):
                 group_identifier=protein_group_id
             )
         if "ProteinName" in  descr:
-            analyte.add_attribute(
-                "MS:1000886|protein name",
-                descr["ProteinName"],
-                group_identifier=protein_group_id
-            )
+            if descr['ProteinName']:
+                analyte.add_attribute(
+                    "MS:1000886|protein name",
+                    descr["ProteinName"],
+                    group_identifier=protein_group_id
+                )
 
         for key in self._custom_analyte_keys:
             if key in descr:
@@ -210,7 +211,7 @@ class DIANNTSVSpectralLibrary(_CSVSpectralLibraryBackendBase):
 
             loss_type = row['FragmentLossType']
             if loss_type != NO_LOSS:
-                loss_type = ['-' + loss_type]
+                loss_type = annotation.NeutralName.parse('-' + loss_type)
             else:
                 loss_type = None
 

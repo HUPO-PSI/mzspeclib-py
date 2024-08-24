@@ -12,7 +12,7 @@ from mzspeclib.validate.level import RequirementLevel
 
 if TYPE_CHECKING:
     from .validator import ValidatorBase
-
+    from mzspeclib.spectrum_library import SpectrumLibrary
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -38,11 +38,48 @@ class ScopedObjectRuleBase:
         self.path = path
         self.requirement_level = requirement_level
 
+    def __eq__(self, other):
+        if other is None:
+            return False
+        props_eq = self.id == other.id and self.path == other.path and self.requirement_level == other.requirement_level
+        if not props_eq:
+            return False
+        return isinstance(other, self.__class__) or isinstance(self, other.__class__)
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __hash__(self):
+        return hash(self.id)
+
     def __call__(self, obj: Attributed, path: str, identifier_path: Tuple, validator_context: "ValidatorBase") -> bool:
         return self.validate(obj, path, identifier_path, validator_context)
 
     def validate(self, obj: Attributed, path: str, identifier_path: Tuple, validator_context: "ValidatorBase") -> bool:
         raise NotImplementedError()
+
+
+class LibraryFormatVersionFirstRule(ScopedObjectRuleBase):
+    def __init__(self, requirement_level: RequirementLevel = RequirementLevel.must):
+        super().__init__("Library_format_version_first_rule", "/Library", requirement_level=requirement_level)
+
+    def validate(self, obj: "SpectrumLibrary", path: str, identifier_path: Tuple, validator_context: "ValidatorBase") -> bool:
+        errors = []
+        attr = next(iter(obj.attributes))
+        is_format_version_key = attr.key == "MS:1003186|library format version"
+        if not is_format_version_key:
+            validator_context.add_warning(
+                obj,
+                path,
+                identifier_path,
+                self,
+                attr,
+                self.requirement_level,
+                f"The first attribute of the library is not 'MS:1003186|library format version': {attr}",
+            )
+        if errors:
+            return False
+        return True
 
 
 class SpectrumPeakAnnotationRule(ScopedObjectRuleBase):

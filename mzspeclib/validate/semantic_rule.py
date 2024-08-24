@@ -283,6 +283,9 @@ class ScopedSemanticRule:
     condition: Optional[AttributeSemanticRule] = dataclasses.field(default=None)
     notes: Optional[str] = dataclasses.field(default=None)
 
+    def __hash__(self):
+        return hash(self.id)
+
     def find_all_children_of(self, attribute_rule: AttributeSemanticRule, obj: Attributed, validator_context: "ValidatorBase") -> Tuple:
         result = []
         for attrib in validator_context.walk_terms_for(attribute_rule.accession):

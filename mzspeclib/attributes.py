@@ -827,6 +827,7 @@ class AttributeSet(AttributedEntity):
                         group_ids[term.group_id] += 1
                     target.remove_attribute(key, group_identifier=term.group_id)
             else:
+                term = terms
                 if term.group_id:
                     group_ids[term.group_id] += 1
                 target.remove_attribute(key, group_identifier=term.group_id)

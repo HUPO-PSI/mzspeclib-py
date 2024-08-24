@@ -235,10 +235,7 @@ class MappingAttributeHandler(AttributeHandler):
         self.keys = keys
 
     def handle(self, key: str, value: Any, container: Attributed) -> bool:
-        try:
-            trans_key = self.keys[key]
-        except KeyError:
-            breakpoint()
+        trans_key = self.keys[key]
         if value is None:
             if isinstance(trans_key, list):
                 k, v = trans_key
@@ -2011,7 +2008,10 @@ class MSPSpectralLibraryWriter(SpectralLibraryWriterBase):
         return str(value)
 
     def _proforma_to_mods(self, proforma_seq: str) -> str:
-        parsed = proforma.ProForma.parse(proforma_seq)
+        if isinstance(proforma_seq, proforma.ProForma):
+            parsed = proforma_seq
+        else:
+            parsed = proforma.ProForma.parse(proforma_seq)
         mods = [(i, tok) for i, tok in enumerate(parsed) if tok[1]]
         if mods:
             tokens = []
@@ -2122,7 +2122,7 @@ class MSPSpectralLibraryWriter(SpectralLibraryWriterBase):
         if not parts:
             return "?"
         if annot.neutral_losses:
-            f = annotation.combine_formula(annot.neutral_losses)
+            f = annotation.NeutralName.combine(annot.neutral_losses)
             if f[0] not in ("-", "+"):
                 f = "+" + f
             parts.append(f)

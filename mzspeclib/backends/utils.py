@@ -342,8 +342,6 @@ class PreBufferedStreamReader(io.IOBase):
         raise io.UnsupportedOperation("Read-only")
 
     def close(self):
-        print("Closing PreBufferedStreamReader")
-        breakpoint()
         self.buffer.close()
         return self.stream.close()
 

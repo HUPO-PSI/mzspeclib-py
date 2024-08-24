@@ -35,10 +35,10 @@ term_pattern = re.compile(
     r"^(?P<term>(?P<term_accession>\S+:(?:\d|X)+)\|(?P<term_name>[^=]+))"
 )
 key_value_term_pattern = re.compile(
-    r"^(?P<term>(?P<term_accession>[A-Za-z0-9:.]+:(?:\d|X)+)\|(?P<term_name>[^=]+?))\s*=\s*(?P<value>.+)"
+    r"^(?P<term>(?P<term_accession>[A-Za-z0-9:.]+:(?:\d|X)+)\|(?P<term_name>[^=]+?))\s*=(\s*(?P<value>.+))?"
 )
 grouped_key_value_term_pattern = re.compile(
-    r"^\[(?P<group_id>\d+)\](?P<term>(?P<term_accession>\S+:(?:\d|X)+)\|(?P<term_name>[^=]+?))\s*=\s*(?P<value>.+)"
+    r"^\[(?P<group_id>\d+)\](?P<term>(?P<term_accession>\S+:(?:\d|X)+)\|(?P<term_name>[^=]+?))\s*=(\s*(?P<value>.+))?"
 )
 float_number = re.compile(r"^\d+(.\d+)?")
 
@@ -162,7 +162,7 @@ class _EntryParser(_Scope):
     def real_line_number_or_nothing(self):
         message = f" on line {self.line_number + self.start_line_number}"
         if self.spectrum_index is not None:
-            message += f" in spectrum {self.spectrum_index}"
+            message += f" in spectrum index {self.spectrum_index}"
         message += f" in state {self.state}"
         return message
 

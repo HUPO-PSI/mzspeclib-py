@@ -161,7 +161,7 @@ class JSONSpectralLibrary(SpectralLibraryBackendBase):
         else:
             raise ValueError("Must provide either spectrum_number or spectrum_name argument")
         data = self.buffer[SPECTRA_KEY][offset]
-        spectrum = self._make_spectrum_from_payload(data)
+        spectrum = self._make_spectrum_from_payload(data, offset)
         return spectrum
 
     def get_cluster(self, cluster_number: int) -> SpectrumCluster:
@@ -237,8 +237,12 @@ class JSONSpectralLibrary(SpectralLibraryBackendBase):
             data[ELEMENT_ATTRIBUTES_KEY], cluster, AttributeSetTypes.cluster)
         return cluster
 
-    def _make_spectrum_from_payload(self, data: Dict) -> Spectrum:
+    def _make_spectrum_from_payload(self, data: Dict, index: int = None) -> Spectrum:
         spectrum = self._new_spectrum()
+
+        if index is not None:
+            spectrum.index = index
+
         self._fill_attributes(
             data[ELEMENT_ATTRIBUTES_KEY],
             spectrum,
@@ -295,7 +299,7 @@ class JSONSpectralLibrary(SpectralLibraryBackendBase):
         n = len(self.buffer[SPECTRA_KEY])
         for offset in range(n):
             data = self.buffer[SPECTRA_KEY][offset]
-            spectrum = self._make_spectrum_from_payload(data)
+            spectrum = self._make_spectrum_from_payload(data, offset)
             yield spectrum
 
 

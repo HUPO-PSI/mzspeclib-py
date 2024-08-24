@@ -10,7 +10,7 @@ from pyteomics import proforma
 from mzspeclib import annotation
 from mzspeclib.analyte import Analyte
 from mzspeclib.backends.base import LIBRARY_NAME_TERM, _CSVSpectralLibraryBackendBase, FORMAT_VERSION_TERM, DEFAULT_VERSION
-from mzspeclib.backends.utils import open_stream, urlify
+from mzspeclib.backends.utils import open_stream, urlify, try_cast
 from mzspeclib.spectrum import Spectrum, SPECTRUM_NAME
 
 
@@ -196,7 +196,7 @@ class SpectronautTSVSpectralLibrary(_CSVSpectralLibraryBackendBase):
 
             loss_type = row['FragmentLossType']
             if loss_type != NO_LOSS:
-                loss_type = ['-' + loss_type]
+                loss_type = annotation.NeutralName.parse('-' + loss_type)
             else:
                 loss_type = None
 
@@ -241,9 +241,9 @@ class SpectronautTSVSpectralLibrary(_CSVSpectralLibraryBackendBase):
                 group_identifier=protein_group_id
             )
 
-        if "OrganismId" in description:
+        if "OrganismId" in description and description["OrganismId"] is not None:
             analyte.add_attribute_group([
-                ["MS:1001467|taxonomy: NCBI TaxID", f"NCBITaxon:{description['OrganismId']}|{description['Organisms']}"],
+                ["MS:1001467|taxonomy: NCBI TaxID", try_cast(description['OrganismId'])],
                 ["MS:1001469|taxonomy: scientific name", description['Organisms']],
             ])
 

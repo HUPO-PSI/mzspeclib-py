@@ -39,12 +39,13 @@ def _display_tree(tree, indent: int=0):
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
-def main():
+@click.option("-d", "--debug-logging", is_flag=True, help="Enable debug logging")
+def main(debug_logging=False):
     """A collection of utilities for inspecting and manipulating spectral libraries."""
-    format_string = '[%(asctime)s] %(levelname).1s | %(name)s | %(message)s'
+    format_string = '[%(asctime)s] %(levelname).1s | %(name)s | %(filename)s:%(funcName)s:%(lineno)d | %(message)s'
 
     logging.basicConfig(
-        level='INFO',
+        level='INFO' if not debug_logging else "DEBUG",
         stream=sys.stderr,
         format=format_string,
         datefmt="%H:%M:%S")
@@ -55,6 +56,8 @@ def main():
         handler.setFormatter(
             fmtr
         )
+    # if debug_logging:
+    #     sys.excepthook = debug_hook
 
 
 @main.command("describe", short_help=("Produce a minimal textual description"
@@ -191,6 +194,8 @@ def validate(inpath, profiles=None, input_format=None):
 
     logger.info(f"Loading validators...")
     chain = validator.get_validator_for("base")
+    chain |= validator.ControlledVocabularyAttributeValidator()
+    chain |= validator.get_object_validator_for("base")
     chain |= validator.get_object_validator_for("peak_annotations")
     for profile in profiles:
         if profile is None:
@@ -208,9 +213,23 @@ def validate(inpath, profiles=None, input_format=None):
         by_level[message.requirement_level].append(message)
 
     for level, bucket in sorted(by_level.items()):
-        logger.info(f"Found {len(bucket)} violations for {level.name.upper()} rules")
+        log_level = logging.WARN
+        if level == RequirementLevel.may:
+            log_level = logging.DEBUG
+        logger.log(log_level, f"Found {len(bucket)} violations for {level.name.upper()} rules")
         for err in bucket:
-            logger.warn(f"... {err.message}")
+            logger.log(log_level, f"... {err.message}")
+
+
+def debug_hook(type, value, tb):
+    if not sys.stderr.isatty():
+        click.secho("Running interactively, not starting debugger", fg="yellow")
+        sys.__excepthook__(type, value, tb)
+    else:
+        import pdb
+        import traceback
+        traceback.print_exception(type, value, tb)
+        pdb.post_mortem(tb)
 
 
 if __name__ == "__main__":

@@ -395,8 +395,13 @@ class JSONSpectralLibraryWriter(SpectralLibraryWriterBase):
                 reformed_attribute['value_accession'] = value_accession
                 reformed_attribute['value'] = value
             elif len(components) == 1:
-                # If an attribute could take on a JSON-incompatible type, we would need to
-                # cast it here.
+                # If an attribute could take on a JSON-incompatible type, we need to
+                # cast it prior to writing it out.
+                if not isinstance(value, (str, int, float, list)):
+                    if term is not None:
+                        value = term.value_type.format(value)
+                    else:
+                        value = str(value)
                 reformed_attribute['value'] = value
             else:
                 raise ValueError(

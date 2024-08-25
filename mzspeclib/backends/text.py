@@ -203,6 +203,10 @@ class _EntryParser(_Scope):
             self.cluster.key = int(match.group(1)) or self.cluster.index - 1
             return
 
+        if self.spectrum is None:
+            raise ValueError(
+                f"Spectrum not yet initialized when trying to add attribute in state {self.state}{self.real_line_number_or_nothing()}"
+            )
         self._parse_attribute_into(
             line, self.spectrum, self.real_line_number_or_nothing
         )
@@ -630,6 +634,9 @@ class TextSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
             entry_is_cluster = False
 
             # Required for counting file_offset manually (LF vs CRLF)
+            # NOTE: If the file has been manually editted with different line endings
+            # for some but not all spectra, this assumption **WILL** probably fail
+            # to maintain the invariant. We probably need something more intrusive.
             infile.readline()
             file_offset_line_ending = len(infile.newlines) - 1
             infile.seek(0)
@@ -642,7 +649,7 @@ class TextSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
 
                 line_beginning_file_offset = file_offset
 
-                #### tell() is twice as slow as counting it myself
+                # From Eric: tell() is twice as slow as counting it myself
                 file_offset += len(line) + file_offset_line_ending
 
                 line = line.rstrip()

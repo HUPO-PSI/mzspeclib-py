@@ -22,7 +22,7 @@ classifiers=[
 dependencies = [
     "sqlalchemy",
     "click",
-    "psims >= 0.1.41",
+    "psims >= 1.3.4",
     "pyteomics >= 4.5.3",
     "mzpaf"
 ]

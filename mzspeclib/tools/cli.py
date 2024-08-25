@@ -1,10 +1,12 @@
 import logging
+import os
 import sys
 import click
 import logging
 import json
 import csv
 
+from pathlib import Path
 from typing import DefaultDict, List
 
 from mzspeclib.spectrum_library import SpectrumLibrary
@@ -40,7 +42,8 @@ def _display_tree(tree, indent: int=0):
 
 @click.group(context_settings=CONTEXT_SETTINGS)
 @click.option("-d", "--debug-logging", is_flag=True, help="Enable debug logging")
-def main(debug_logging=False):
+@click.option("-l", "--log-file", type=click.Path(writable=True, path_type=Path), help="Write log messages to this file as well as STDERR")
+def main(debug_logging=False, log_file: Path=None):
     """A collection of utilities for inspecting and manipulating spectral libraries."""
     format_string = '[%(asctime)s] %(levelname).1s | %(name)s | %(filename)s:%(funcName)s:%(lineno)d | %(message)s'
 
@@ -56,8 +59,19 @@ def main(debug_logging=False):
         handler.setFormatter(
             fmtr
         )
-    # if debug_logging:
-    #     sys.excepthook = debug_hook
+
+    if log_file is not None:
+        if not log_file.parent.exists():
+            os.makedirs(log_file.parent)
+        handler = logging.FileHandler(str(log_file), mode='w')
+        handler.setLevel(logging.INFO if not debug_logging else logging.DEBUG)
+        handler.setFormatter(
+            logging.Formatter(format_string, "%H:%M:%S")
+        )
+        logging.getLogger().addHandler(handler)
+
+    if debug_logging:
+        sys.excepthook = debug_hook
 
 
 @main.command("describe", short_help=("Produce a minimal textual description"
@@ -165,7 +179,7 @@ def _progress_logger(iterable, label, increment: int=100):
     n = len(iterable)
     for i, item in enumerate(iterable):
         if i % increment == 0 and i:
-            logger.info(f"... {label} {i}/{n} ({i * 100 / n:0.2f}%)")
+            logger.info(f"... {label} {i}/{n} ({i * 100 / n:0.2f}%)", stacklevel=2)
         yield item
 
 

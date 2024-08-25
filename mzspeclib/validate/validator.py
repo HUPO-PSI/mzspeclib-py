@@ -1,3 +1,4 @@
+import datetime
 import itertools
 import logging
 import warnings
@@ -98,6 +99,7 @@ def _try_convert(value, converter) -> Tuple[bool, Optional[str]]:
 
 
 class ValidatorBase(_VocabularyResolverMixin):
+    name: str = None
     error_log: List
     current_context: ValidationContext
 
@@ -125,12 +127,12 @@ class ValidatorBase(_VocabularyResolverMixin):
             key = obj.id
         else:
             key = ""
-        warning = f"{attrib.id if hasattr(attrib, 'id') else attrib} failed to validate {path}:{key} ({requirement_level.name.upper()}): {message}"
+        warning = f"{attrib.id if hasattr(attrib, 'id') else attrib} failed to validate {path}:{identifier_path or key} ({requirement_level.name.upper()}): {message} ({self.name})"
         log_level = logging.WARN
         if requirement_level == RequirementLevel.may:
             log_level = logging.DEBUG
         logger.log(log_level, warning, stacklevel=2)
-        self.error_log.append(ValidationError(path, identifier_path, attrib, value, requirement_level, warning))
+        self.error_log.append(ValidationError(path, identifier_path, attrib, value, requirement_level, warning, self.name))
 
     def validate_spectrum(
         self,
@@ -206,11 +208,151 @@ class ValidatorBase(_VocabularyResolverMixin):
             yield f"{entity.id}|{entity.name}"
 
 
+INTENSITY_UNITS = ("MS:1000131", "MS:1000132", "MS:1000905", " MS:1000814", "UO:0000269")
+
+def is_intensity_units(units: List):
+    for unit_rel in units:
+        if unit_rel.accession in INTENSITY_UNITS:
+            return True
+    return False
+
+
 class ControlledVocabularyAttributeValidator(ValidatorBase):
     name: str = "ControlledVocabularyAttributeValidator"
 
     def apply_rules(self, obj: Attributed, path: str, identifier_path: Tuple) -> bool:
         return True
+
+    def _check_value_types(self, obj: Attributed, path: str, identifier_path: Tuple, attrib, term: Entity) -> bool:
+        valid: bool = True
+        value_types = term.get("has_value_type")
+        if not value_types:
+            value_parsed = isinstance(attrib.value, Attribute)
+            if value_parsed or is_curie(attrib.value):
+                if value_parsed:
+                    value_key = attrib.value.key.split("|")[0]
+                else:
+                    value_key = attrib.value.split("|")[0]
+                if is_curie(value_key):
+                    value_term = self.find_term_for(value_key)
+                else:
+                    value_term = None
+                if not value_term or not value_term.is_of_type(term):
+                    self.add_warning(
+                        obj,
+                        path,
+                        identifier_path,
+                        attrib.key,
+                        attrib.value,
+                        RequirementLevel.must,
+                        f"The value type of {attrib.key} must be a term derived from {attrib.key}, but found {attrib.value}",
+                    )
+                    valid = False
+                    return valid
+            else:
+                self.add_warning(
+                    obj,
+                    path,
+                    identifier_path,
+                    attrib.key,
+                    attrib.value,
+                    RequirementLevel.must,
+                    f"The value type of {attrib.key} must be a term derived from {attrib.key}",
+                )
+                valid = False
+                return valid
+        else:
+            type_message_errors = []
+            for rel in value_types:
+                if isinstance(rel.value_type, ListOfType):
+                    hit = False
+                    for tp in rel.value_type.type_definition.entity.has_value_type:
+                        if isinstance(attrib.value, Sequence) and all(
+                            isinstance(v, tp.value_type.type_definition) for v in attrib.value
+                        ):
+                            hit = True
+                            break
+                    if hit:
+                        break
+                type_match, message = _is_of_type(attrib, rel)
+                if message is not None:
+                    type_message_errors.append(message)
+                if type_match:
+                    break
+            else:
+                type_message_errors = ", ".join(type_message_errors)
+                self.add_warning(
+                    obj,
+                    path,
+                    identifier_path,
+                    attrib.key,
+                    attrib.value,
+                    RequirementLevel.must,
+                    f"The value type of {attrib.key} must be a value of type {', '.join([rel.value_type.id for rel in value_types])}, but got {type(attrib.value)} {type_message_errors}",
+                )
+                valid = False
+        return valid
+
+    def _check_units(self, obj: Attributed, path: str, identifier_path: Tuple, attrib, term: Entity) -> bool:
+        valid: bool = True
+        units = term.get("has_units")
+        if units:
+            if not isinstance(units, list):
+                units = [units]
+
+            is_intensity_measure = is_intensity_units(units)
+
+            if attrib.group_id is not None:
+                try:
+                    unit_attrib = obj.get_attribute("UO:0000000|unit", group_identifier=attrib.group_id, raw=True)
+                except KeyError:
+                    unit_attrib = None
+                    if len(units) == 1:
+                        logger.warning(f"{attrib.key}'s unit is missing, defaulting to {units[0]}")
+                        return valid
+            else:
+                unit_attrib = None
+                if len(units) == 1:
+                    logger.debug(f"{attrib.key}'s unit is missing, defaulting to {units[0]}")
+                    return valid
+
+            if not unit_attrib and is_intensity_measure:
+                try:
+                    unit_attrib = obj.get_attribute("MS:1000043|intensity unit", raw=True)
+                except KeyError:
+                    pass
+
+            if unit_attrib:
+                unit_acc, unit_name = unit_attrib.value.split("|", 1)
+                for unit in units:
+                    if unit_acc == unit.accession or unit_name == unit.comment:
+                        break
+                else:
+                    self.add_warning(
+                        obj,
+                        path,
+                        identifier_path,
+                        attrib.key,
+                        attrib.value,
+                        RequirementLevel.must,
+                        f"The attribute {attrib.key} must have a unit {', '.join([rel.accession + '|' + rel.comment for rel in units])}, but got {unit_acc}|{unit_name}",
+                    )
+                    valid = False
+                    return valid
+            else:
+                if not term.id in DEFAULT_UNITS:
+                    self.add_warning(
+                        obj,
+                        path,
+                        identifier_path,
+                        attrib.key,
+                        attrib.value,
+                        RequirementLevel.must,
+                        f"The attribute {attrib.key} must have a unit {', '.join([rel.accession + '|' + rel.comment for rel in units])}, but none were found",
+                    )
+                    valid = False
+                    return valid
+        return valid
 
     def check_attributes(self, obj: Attributed, path: str, identifier_path: Tuple) -> bool:
         valid: bool = True
@@ -224,119 +366,9 @@ class ControlledVocabularyAttributeValidator(ValidatorBase):
             except KeyError:
                 logger.warn(f"Could not resolve term for {attrib.key}")
                 continue
-            value_types = term.get("has_value_type")
-            if not value_types:
-                value_parsed = isinstance(attrib.value, Attribute)
-                if value_parsed or is_curie(attrib.value):
-                    if value_parsed:
-                        value_key = attrib.value.key.split("|")[0]
-                    else:
-                        value_key = attrib.value.split("|")[0]
-                    if is_curie(value_key):
-                        value_term = self.find_term_for(value_key)
-                    else:
-                        value_term = None
-                    if not value_term or not value_term.is_of_type(term):
-                        self.add_warning(
-                            obj,
-                            path,
-                            identifier_path,
-                            attrib.key,
-                            attrib.value,
-                            RequirementLevel.must,
-                            f"The value type of {attrib.key} must be a term derived from {attrib.key}, but found {attrib.value}",
-                        )
-                        valid = False
-                        continue
-                else:
-                    self.add_warning(
-                        obj,
-                        path,
-                        identifier_path,
-                        attrib.key,
-                        attrib.value,
-                        RequirementLevel.must,
-                        f"The value type of {attrib.key} must be a term derived from {attrib.key}",
-                    )
-                    valid = False
-                    continue
-            else:
-                type_message_errors = []
-                for rel in value_types:
-                    if isinstance(rel.value_type, ListOfType):
-                        hit = False
-                        for tp in rel.value_type.type_definition.entity.has_value_type:
-                            if isinstance(attrib.value, Sequence) and all(
-                                isinstance(v, tp.value_type.type_definition) for v in attrib.value
-                            ):
-                                hit = True
-                                break
-                        if hit:
-                            break
-                    type_match, message = _is_of_type(attrib, rel)
-                    if message is not None:
-                        type_message_errors.append(message)
-                    if type_match:
-                        break
-                else:
-                    type_message_errors = ", ".join(type_message_errors)
-                    self.add_warning(
-                        obj,
-                        path,
-                        identifier_path,
-                        attrib.key,
-                        attrib.value,
-                        RequirementLevel.must,
-                        f"The value type of {attrib.key} must be a value of type {', '.join([rel.value_type.id for rel in value_types])}, but got {type(attrib.value)} {type_message_errors}",
-                    )
-                    valid = False
 
-            units = term.get("has_units")
-            if units:
-                if not isinstance(units, list):
-                    units = [units]
-
-                if attrib.group_id is not None:
-                    try:
-                        unit_attrib = obj.get_attribute("UO:0000000|unit", group_identifier=attrib.group_id, raw=True)
-                    except KeyError:
-                        unit_attrib = None
-                        if len(units) == 1:
-                            logger.warning(f"{attrib.key}'s unit is missing, defaulting to {units[0]}")
-                            continue
-                else:
-                    unit_attrib = None
-                    if len(units) == 1:
-                        logger.debug(f"{attrib.key}'s unit is missing, defaulting to {units[0]}")
-                        continue
-                if unit_attrib:
-                    unit_acc, unit_name = unit_attrib.value.split("|", 1)
-                    for unit in units:
-                        if unit_acc == unit.accession or unit_name == unit.comment:
-                            break
-                    else:
-                        self.add_warning(
-                            obj,
-                            path,
-                            identifier_path,
-                            attrib.key,
-                            attrib.value,
-                            RequirementLevel.must,
-                            f"The attribute {attrib.key} must have a unit {', '.join([rel.accession + '|' + rel.comment for rel in units])}, but got {unit_acc}|{unit_name}",
-                        )
-                        valid = False
-                else:
-                    if not term.id in DEFAULT_UNITS:
-                        self.add_warning(
-                            obj,
-                            path,
-                            identifier_path,
-                            attrib.key,
-                            attrib.value,
-                            RequirementLevel.must,
-                            f"The attribute {attrib.key} must have a unit {', '.join([rel.accession + '|' + rel.comment for rel in units])}, but none were found",
-                        )
-                        valid = False
+            valid &= self._check_value_types(obj, path, identifier_path, attrib, term)
+            valid &= self._check_units(obj, path, identifier_path, attrib, term)
 
         return valid
 
@@ -349,6 +381,10 @@ class ValidationError:
     value: Any
     requirement_level: RequirementLevel
     message: str
+    source: str = None
+
+    def __hash__(self):
+        return hash((self.path, self.identifier_path, self.attribute, self.message))
 
 
 class Validator(ValidatorBase):
@@ -369,7 +405,7 @@ class Validator(ValidatorBase):
                 v = rule(obj, path, identifier_path, self)
                 level = logging.DEBUG
                 if not v and rule.requirement_level > RequirementLevel.may:
-                    level = logging.WARN
+                    # level = logging.WARN
                     result &= v
                 logger.log(level, f"Applied {rule.id} to {path}:{identifier_path} {v}/{result}")
         return result

@@ -7,7 +7,7 @@ import json
 import csv
 
 from pathlib import Path
-from typing import DefaultDict, List
+from typing import DefaultDict, Iterator, List, TypeVar
 
 from mzspeclib.spectrum_library import SpectrumLibrary
 from mzspeclib.index import MemoryIndex, SQLIndex
@@ -174,8 +174,9 @@ def build_index(inpath, input_format=None):
         click.echo(f"{err}", err=True)
         raise click.Abort()
 
+T = TypeVar('T')
 
-def _progress_logger(iterable, label, increment: int=100):
+def _progress_logger(iterable: Iterator[T], label, increment: int=100) -> Iterator[T]:
     n = len(iterable)
     for i, item in enumerate(iterable):
         if i % increment == 0 and i:

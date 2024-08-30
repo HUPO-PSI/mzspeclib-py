@@ -1,8 +1,16 @@
 from .text import TextSpectralLibrary, TextSpectralLibraryWriter
 from .json import JSONSpectralLibrary, JSONSpectralLibraryWriter
-from .msp import MSPSpectralLibrary
-from .bibliospec import BibliospecSpectralLibrary
+from .msp import MSPSpectralLibrary, MSPSpectralLibraryWriter
+from .bibliospec import BibliospecSpectralLibrary, BlibIndex
 from .sptxt import SPTXTSpectralLibrary
 from .diann import DiaNNTSVSpectralLibrary, DIANNTSVSpectralLibrary
 from .spectronaut import SpectronautTSVSpectralLibrary
-from .base import (guess_implementation, SpectralLibraryBackendBase, SpectralLibraryWriterBase, FormatInferenceFailure)
+from .encyclopedia import EncyclopediaSpectralLibrary, EncyclopediaIndex
+from .base import (
+    guess_implementation,
+    SpectralLibraryBackendBase,
+    SpectralLibraryWriterBase,
+    FormatInferenceFailure,
+    AttributeSetTypes,
+    LibraryIterator,
+)

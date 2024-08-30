@@ -1,4 +1,5 @@
 """Helper module for I/O operations"""
+
 import os
 import io
 import gzip
@@ -9,7 +10,7 @@ from urllib import parse as urlparse
 from typing import Any, Dict, Iterable, Mapping, Optional, Union
 
 DEFAULT_BUFFER_SIZE = int(2e6)
-GZIP_MAGIC = b'\037\213'
+GZIP_MAGIC = b"\037\213"
 
 GzipFile = gzip.GzipFile
 logger = logging.getLogger(__name__)
@@ -18,6 +19,7 @@ logger.addHandler(logging.NullHandler())
 try:
     # Fast random acces with Gzip compatibility
     import idzip
+
     idzip.compressor.IdzipWriter.enforce_extension = False
 
     GzipFile = idzip.IdzipFile
@@ -37,20 +39,30 @@ class _LineBuffer(object):
     encoding: Optional[str]
     _stream_is_file_like: bool
 
-    def __init__(self, stream: io.IOBase, lines: Iterable=None, last_line: str=None, encoding: Optional[str]=None):
+    def __init__(
+        self,
+        stream: io.IOBase,
+        lines: Iterable = None,
+        last_line: str = None,
+        encoding: Optional[str] = None,
+    ):
         if lines is None:
             lines = []
         self.lines = deque(lines)
         self.stream = stream
         self.last_line = last_line
         self.encoding = encoding
-        self._stream_is_file_like = hasattr(self.stream, 'readline')
+        self._stream_is_file_like = hasattr(self.stream, "readline")
 
     def readline(self) -> Union[bytes, str]:
         if self.lines:
             line = self.lines.popleft()
         else:
-            line = self.stream.readline() if self._stream_is_file_like else next(self.stream)
+            line = (
+                self.stream.readline()
+                if self._stream_is_file_like
+                else next(self.stream)
+            )
         self.last_line = line
         if self.encoding:
             return line.decode(self.encoding)
@@ -61,7 +73,9 @@ class _LineBuffer(object):
             line = self.last_line
             self.last_line = None
         if line is None:
-            raise ValueError("Cannot push empty value after the backtrack line is consumed")
+            raise ValueError(
+                "Cannot push empty value after the backtrack line is consumed"
+            )
         self.lines.appendleft(line)
 
     def __iter__(self):
@@ -118,7 +132,7 @@ def test_gzipped(f) -> bool:
     bool
     """
     if isinstance(f, os.PathLike):
-        f = io.open(f, 'rb')
+        f = io.open(f, "rb")
     try:
         current = f.tell()
         assert current >= 0
@@ -175,7 +189,14 @@ class _NotClosingWrapper:
         return
 
 
-def open_stream(f: Union[io.IOBase, os.PathLike], mode='rt', buffer_size: Optional[int]=None, encoding: Optional[str]='utf8', newline=None, closing=False):
+def open_stream(
+    f: Union[io.IOBase, os.PathLike],
+    mode="rt",
+    buffer_size: Optional[int] = None,
+    encoding: Optional[str] = "utf8",
+    newline=None,
+    closing=False,
+):
     """
     Select the file reading type for the given path or stream.
 
@@ -190,9 +211,9 @@ def open_stream(f: Union[io.IOBase, os.PathLike], mode='rt', buffer_size: Option
         buffer_size = DEFAULT_BUFFER_SIZE
     is_stream = False
     offset = None
-    if 'r' in mode:
-        if not hasattr(f, 'read'):
-            f = io.open(f, 'rb')
+    if "r" in mode:
+        if not hasattr(f, "read"):
+            f = io.open(f, "rb")
         else:
             is_stream = True
             offset = f.tell()
@@ -205,18 +226,20 @@ def open_stream(f: Union[io.IOBase, os.PathLike], mode='rt', buffer_size: Option
                 f = _NotClosingWrapper(f)
             buffered_reader = f
         if test_gzipped(buffered_reader):
-            handle = GzipFile(fileobj=buffered_reader, mode='rb')
+            handle = GzipFile(fileobj=buffered_reader, mode="rb")
         else:
             handle = buffered_reader
     else:
-        raise NotImplementedError("Haven't implemented automatic output stream determination")
+        raise NotImplementedError(
+            "Haven't implemented automatic output stream determination"
+        )
     try:
         fmode = f.mode
         if isinstance(fmode, int):
             # gzip.GzipFile uses ints in `mode`
-            fmode = 'b'
+            fmode = "b"
     except AttributeError:
-        fmode = 'b'
+        fmode = "b"
     if "b" not in mode and "b" in fmode:
         handle = io.TextIOWrapper(handle, encoding=encoding, newline=newline)
     if is_stream and handle.seekable():
@@ -244,7 +267,7 @@ class CaseInsensitiveDict(Dict[str, Any]):
         super().__delitem__(key.lower())
 
     def __contains__(self, __o: str) -> bool:
-        if hasattr(__o, 'lower'):
+        if hasattr(__o, "lower"):
             return super().__contains__(__o.lower())
         else:
             return super().__contains__(__o)
@@ -259,8 +282,8 @@ class CaseInsensitiveDict(Dict[str, Any]):
 def urlify(path: str) -> str:
     """Convert a path into a URL if it is not already one."""
     parsed = urlparse.urlparse(path)
-    if parsed.scheme == '':
-        parsed = parsed._replace(scheme='file')
+    if parsed.scheme == "":
+        parsed = parsed._replace(scheme="file")
     return urlparse.urlunparse(parsed)
 
 

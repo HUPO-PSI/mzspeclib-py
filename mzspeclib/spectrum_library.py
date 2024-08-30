@@ -2,7 +2,7 @@
 import os
 import pathlib
 
-from typing import Any, Optional, Type, List, Union
+from typing import Any, Iterator, Optional, Type, List, Union
 from mzspeclib.attributes import Attribute, AttributeManagedProperty, AttributeManager
 from mzspeclib.backends.base import LIBRARY_DESCRIPTION_TERM, LIBRARY_NAME_TERM, LIBRARY_URI_TERM, LIBRARY_VERSION_TERM
 from mzspeclib.cluster import SpectrumCluster
@@ -305,7 +305,7 @@ class SpectrumLibrary:
             return len(self.backend)
         return 0
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Spectrum]:
         if self._backend_initialized():
             return iter(self.backend)
         return iter([])

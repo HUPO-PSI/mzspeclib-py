@@ -24,20 +24,24 @@ series_to_color = {
 
 
 def peaklist_to_vector(peaklist, width=0.000001):
-    """Convert a list of discrete centroided peaks into a pair of continuous m/z
+    """
+    Convert a list of discrete centroided peaks into a pair of continuous m/z
     and intensity arrays
+
     Parameters
     ----------
     peaklist : :class:`~Iterable` of :class:`~.PeakLike`
         The collection of peaks to convert
     width : float, optional
         The spacing between the center of the peak and it's shoulders
+
     Returns
     -------
     np.ndarray:
         The generated m/z array
     np.ndarray:
         The generated intensity array
+
     Raises
     ------
     TypeError
@@ -76,6 +80,7 @@ def draw_spectrum(spectrum, ax=None, normalize=False, label_threshold=0.1, label
         The degrees of rotation to apply to peak labels
     **kwargs
         Passed to :meth:`matplotlib.Axes.plot`
+
     Returns
     -------
     matplotlib.Axes

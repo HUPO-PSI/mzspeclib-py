@@ -389,7 +389,7 @@ class SpectralLibraryBackendBase(AttributedEntity, _VocabularyResolverMixin, _Li
         """
         raise NotImplementedError()
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Spectrum]:
         if self.index:
             for record in self.index:
                 yield self.get_spectrum(record.number)

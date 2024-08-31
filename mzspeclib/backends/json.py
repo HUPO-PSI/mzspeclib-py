@@ -509,8 +509,10 @@ class JSONSpectralLibraryWriter(SpectralLibraryWriterBase):
                     json.dump(spectra, self.handle)
 
     def close(self):
-        self.flush()
-        self.handle.close()
+        if not self.handle.closed:
+            self.flush()
+            self.handle.close()
+
 
 
 def format_spectrum(spectrum: Spectrum, pretty_print=True, **kwargs) -> str:

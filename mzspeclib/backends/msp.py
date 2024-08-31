@@ -2146,4 +2146,5 @@ class MSPSpectralLibraryWriter(SpectralLibraryWriterBase):
             self.handle.write(f'{peak[0]:0.4f}\t{peak[1]:0.4f}\t"{annot}"\n')
 
     def close(self):
-        self.handle.close()
+        if not self.handle.closed:
+            self.handle.close()

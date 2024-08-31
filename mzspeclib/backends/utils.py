@@ -368,8 +368,9 @@ class PreBufferedStreamReader(io.IOBase):
         self.buffer.close()
         return self.stream.close()
 
+    @property
     def closed(self):
-        return self.stream.closed()
+        return self.stream.closed
 
     def seekable(self):
         return True

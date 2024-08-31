@@ -1020,7 +1020,8 @@ class TextSpectralLibraryWriter(SpectralLibraryWriterBase):
         self.handle.write("\n")
 
     def close(self):
-        self.handle.close()
+        if not self.handle.closed:
+            self.handle.close()
 
 
 def format_aggregation(value: Union[numbers.Number, str]) -> str:

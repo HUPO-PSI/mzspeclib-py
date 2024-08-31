@@ -1,13 +1,13 @@
 """
-Indexing
---------
+Spectral Library Indexing
+=========================
 
-:term:`mzSpecLib` recommends that each file format be indexed in
+:title-reference:`MzSpecLib` recommends that each file format be indexed in
 a way that is appropriate to the format and the application, and
 recognizes that most formats will not have any kind of built-in
 index.
 
-:mod:`mzlib` provides data structures for both in-memory and on-disk
+:mod:`mzspeclib` provides data structures for both in-memory and on-disk
 index storage.
 
 The :class:`~.IndexBase` type is an abstract base class for writing

@@ -59,12 +59,19 @@ class InterpretationCollection(MutableMapping[str, 'Interpretation']):
         self.interpretations = interpretations
 
     def get_interpretation(self, interpretation_id) -> 'Interpretation':
+        """Get the interpretation given by the key ``interpretation_id``"""
         return self.interpretations[str(interpretation_id)]
 
     def add_interpretation(self, interpretation: 'Interpretation'):
+        """
+        Add an :class:`Interpretation` to the collection.
+
+        The key used will be :attr:`Interpretation.id`.
+        """
         self.set_interpretation(str(interpretation.id), interpretation)
 
     def set_interpretation(self, key, interpretation: 'Interpretation'):
+        """Set the interpretation for ``key`` to ``interpretation``"""
         self.interpretations[str(key)] = interpretation
 
     def __getitem__(self, key) -> 'Interpretation':
@@ -116,7 +123,7 @@ class Interpretation(AttributedEntity, MutableMapping):
     analytes : dict[str, :class:`Analyte`]
         The analytes which are part of interpretations.
     member_interpretations : dict[str, :class:`InterpretationMember`]
-        The interpretation details which are associated with specific :class:`Analyte`s.
+        The interpretation details which are associated with specific :class:`Analyte` members.
     """
 
     __slots__ = ('id', 'analytes', 'member_interpretations')

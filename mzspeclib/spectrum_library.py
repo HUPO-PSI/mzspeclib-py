@@ -2,7 +2,7 @@
 import os
 import pathlib
 
-from typing import Any, Iterator, Optional, Type, List, Union
+from typing import Any, Iterator, Optional, Set, Type, List, Union
 from mzspeclib.attributes import Attribute, AttributeManagedProperty, AttributeManager
 from mzspeclib.backends.base import LIBRARY_DESCRIPTION_TERM, LIBRARY_NAME_TERM, LIBRARY_URI_TERM, LIBRARY_VERSION_TERM
 from mzspeclib.cluster import SpectrumCluster
@@ -10,14 +10,17 @@ from mzspeclib.cluster import SpectrumCluster
 from mzspeclib.spectrum_library_index import SpectrumLibraryIndex
 from mzspeclib.spectrum import Spectrum
 from mzspeclib.index import IndexBase
-from mzspeclib.backends import guess_implementation, SpectralLibraryBackendBase, SpectralLibraryWriterBase
+from mzspeclib.backends import guess_implementation, SpectralLibraryBackendBase, SpectralLibraryWriterBase, FormatInferenceFailure
 
 
 debug = False
 
 class SpectrumLibrary:
     """
-    SpectrumLibrary - Class for a spectrum library
+    Read, write, and search through a spectrum library.
+
+    This type will attempt to infer the correct spectrum library reader from the input
+    file, but may need to be explicitly prompted if there are ambiguities.
 
     Attributes
     ----------
@@ -31,16 +34,20 @@ class SpectrumLibrary:
     backend: :class:`~.SpectralLibraryBackendBase`
         The implementation used to parse the file
 
-    Methods
-    -------
-    read_header - Read just the header of the whole library
-    read - Read the entire library into memory
-    write - Write the library to disk
-    create_index - Create an index file for this library
-    transform - Not quite sure what this is supposed to be
-    get_spectrum - Extract a single spectrum by identifier
-    find_spectra - Return a list of spectra given query constraints
-
+    Parameters
+    ----------
+    identifier : str, optional
+        A universal identifier for a hosted spectral library to fetch.
+    filename : str, os.PathLike, or io.IOBase, optional
+        A path-like or file-like object that holds a spectral library to read.
+    format : string
+        Name of the format for the current encoding of the library.
+    index_type : Type[:class:`~.mzlib.index.base.IndexBase`]
+        The type of index to preferentially construct.
+    create_index : bool
+        Whether to construct an index over the library if one does not exist
+        already. This limits the library to sequential iteration but does not
+        incur an expensive end-to-end parsing step upon opening.
     """
 
     backend: SpectralLibraryBackendBase
@@ -58,21 +65,26 @@ class SpectrumLibrary:
     _filename = None
     _create_index: bool
 
-    def __init__(self, identifier=None, filename=None, format=None, index_type=None, create_index=True):
-        """
-        __init__ - SpectrumLibrary constructor
+    def __repr__(self):
+        components = []
 
-        Parameters
-        ----------
-        identifier : str, optional
-            A universal identifier for a hosted spectral library to fetch.
-        filename : str, os.PathLike, or io.IOBase, optional
-            A path-like or file-like object that holds a spectral library to read.
-        format : string
-            Name of the format for the current encoding of the library.
-        index_type : Type[:class:`~.mzlib.index.base.IndexBase`]
-            The type of index to preferentially construct.
-        """
+        if self.identifier:
+            components.append(f"identifier={self.identifier!r}")
+        if self.filename:
+            components.append(f"filename={self.filename!r}")
+        if self.backend is not None:
+            components.append(f"backend={self.backend.__class__.__name__}")
+
+        return f"{self.__class__.__name__}({', '.join(components)})"
+
+    def __init__(
+        self,
+        identifier: Optional[str] = None,
+        filename: Optional[str] = None,
+        format: Optional[Type[SpectralLibraryBackendBase]]=None,
+        index_type: Optional[Type[IndexBase]]=None,
+        create_index: bool=True,
+    ):
         self.backend = None
         self._create_index = create_index
         self._format = format
@@ -85,7 +97,7 @@ class SpectrumLibrary:
             # This in turn initializes the backend
             self.filename = self.identifier
 
-    def _init_from_filename(self, index_type: Type[IndexBase]=None):
+    def _init_from_filename(self, index_type: Optional[Type[IndexBase]]=None):
         if index_type is None:
             index_type = self.index_type
         if self.format is None:
@@ -111,6 +123,21 @@ class SpectrumLibrary:
         if not self._backend_initialized():
             raise ValueError(
                 "Cannot read library data, library parser not yet initialized")
+
+    @classmethod
+    def from_backend(cls, backend: SpectralLibraryBackendBase) -> "SpectrumLibrary":
+        """
+        Wrap a format-specific backend in a :class:`SpectrumLibrary`.
+
+        This is useful because the respective backends do not support all
+        operations.
+        """
+        self = cls()
+        self.backend = backend
+        self._format = backend.__class__
+        self.filename = self.backend.filename
+        self.index_type = self.backend.index.__class__
+        return self
 
     @property
     def spectrum_attribute_sets(self):
@@ -390,6 +417,13 @@ class SpectrumLibrary:
         """Retrieve a free-form description of parsing errors"""
         return self.backend.summarize_parsing_errors()
 
+    @staticmethod
+    def supported_file_extensions() -> Set[str]:
+        """
+        Get the set of file extensions that are currently recognized as spectral
+        library formats
+        """
+        return set(SpectralLibraryBackendBase._file_extension_to_implementation)
 
 
 #### Example using this class

@@ -1,7 +1,8 @@
 """HUPO-PSI Spectral library format."""
 
 from mzspeclib.spectrum import Spectrum
-from mzspeclib.analyte import Analyte, Interpretation
+from mzspeclib.analyte import Analyte, Interpretation, InterpretationMember, InterpretationCollection
+from mzspeclib.cluster import SpectrumCluster
 
 from mzspeclib.index import MemoryIndex, SQLIndex
 

@@ -6,7 +6,7 @@ import logging
 import os
 import warnings
 
-from typing import Any, Callable, Dict, Iterable, Optional, Union, List, Type, Iterator
+from typing import Any, Callable, Dict, Iterable, Optional, Union, List, Type, Iterator, TYPE_CHECKING
 from pathlib import Path
 
 
@@ -22,6 +22,9 @@ from mzspeclib.attributes import Attributed, AttributedEntity, AttributeSet, Att
 from mzspeclib.ontology import _VocabularyResolverMixin
 
 from .utils import open_stream, _LineBuffer
+
+if TYPE_CHECKING:
+    from mzspeclib import SpectrumLibrary
 
 logger = logging.getLogger(__name__.rsplit(".", 1)[0])
 logger.addHandler(logging.NullHandler())
@@ -665,6 +668,18 @@ class _CSVSpectralLibraryBackendBase(SpectralLibraryBackendBase):
 
 
 class SpectralLibraryWriterBase(_VocabularyResolverMixin, metaclass=SubclassRegisteringMetaclass):
+    """
+    A base type for spectral library writers.
+
+    This type implements the context manager protocol, controlling the closing of the
+    enclosed IO stream.
+
+    Attributes
+    ----------
+    filename : str, :class:`pathlib.Path`, or :class:`io.IOBase`
+    """
+
+    _already_started_writing: bool = False
 
     def __init__(self, filename, **kwargs):
         self.filename = filename
@@ -705,7 +720,25 @@ class SpectralLibraryWriterBase(_VocabularyResolverMixin, metaclass=SubclassRegi
         else:
             self.handle = open(filename_or_stream, 'wt')
 
-    def write_library(self, library: SpectralLibraryBackendBase):
+    def write_library(self, library: Union[SpectralLibraryBackendBase, "SpectrumLibrary"]):
+        """
+        Write out the entire library.
+
+        Parameters
+        ----------
+        library : :class:`SpectralLibraryBackendBase` or :class:`SpectrumLibrary`
+            The library to write out.
+
+        Raises
+        ------
+        :class:`ValueError` :
+            If the writer has already started writing one library, an error will be
+            raised.
+        """
+        if self._already_started_writing:
+            raise ValueError("Cannot write a new library, already started writing")
+        self._already_started_writing = True
+
         self.write_header(library)
         n = len(library)
         step = max(min(n // 100, 5000), 1)
@@ -733,9 +766,27 @@ class SpectralLibraryWriterBase(_VocabularyResolverMixin, metaclass=SubclassRegi
         logger.info(f"Wrote {n} spectra")
 
     def write_spectrum(self, spectrum: Spectrum):
+        """
+        Write out a :class:`~.Spectrum` and all of its
+        components.
+
+        Parameters
+        ----------
+        spectrum : :class:`~.Spectrum`
+            The spectrum to write.
+        """
         raise NotImplementedError()
 
     def write_cluster(self, cluster: SpectrumCluster):
+        """
+        Write out a :class:`~.SpectrumCluster` and all of its
+        components.
+
+        Parameters
+        ----------
+        cluster : :class:`~.SpectrumCluster`
+            The spectrum cluster to write.
+        """
         raise NotImplementedError()
 
     def __enter__(self) -> 'SpectralLibraryWriterBase':
@@ -744,7 +795,15 @@ class SpectralLibraryWriterBase(_VocabularyResolverMixin, metaclass=SubclassRegi
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
 
+    def __del__(self):
+        self.close()
+
     def close(self):
+        """
+        Close the library writer, performing any necessary finalization.
+
+        This is called automatically when :meth:`__exit__` is called.
+        """
         pass
 
 
@@ -754,13 +813,16 @@ class LibraryIterator(AttributedEntity, _LibraryViewMixin, Iterator[Spectrum]):
     backend: SpectralLibraryBackendBase
     attributes: Attributed
     iter: Iterator[Spectrum]
-    _buffer: Spectrum
+    _buffer: Optional[Spectrum]
 
     def __init__(self, backend: SpectralLibraryBackendBase) -> None:
         self.backend = backend
         self.attributes = backend
         self.iter = backend.read()
-        self._buffer = next(self.iter)
+        try:
+            self._buffer = next(self.iter)
+        except StopIteration:
+            self._buffer = None
 
     def __iter__(self):
         return self

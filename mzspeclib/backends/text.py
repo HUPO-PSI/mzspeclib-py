@@ -16,7 +16,7 @@ from mzspeclib.spectrum import Spectrum
 from mzspeclib.cluster import SpectrumCluster
 from mzspeclib.attributes import Attribute, AttributeManager, Attributed, AttributeSet
 from mzspeclib.analyte import Analyte, Interpretation, InterpretationMember
-from mzspeclib.validate.object_rule import ValidationWarning
+from mzspeclib.utils import ValidationWarning
 
 from .base import (
     SpectralLibraryBackendBase,
@@ -68,7 +68,7 @@ START_OF_SPECTRUM_MARKER = re.compile(r"^<(?:Spectrum)(?:\s*=\s*(.+))?>")
 START_OF_INTERPRETATION_MARKER = re.compile(r"^<Interpretation(?:\s*=\s*(.+))>")
 START_OF_ANALYTE_MARKER = re.compile(r"^<Analyte(?:\s*=\s*(.+))>")
 START_OF_PEAKS_MARKER = re.compile(r"^<Peaks>")
-START_OF_LIBRARY_MARKER = re.compile(r"^<mzSpecLib\s+(.+)>")
+START_OF_LIBRARY_MARKER = re.compile(r"^<mzSpecLib\s*(.+)?>")
 START_OF_INTERPRETATION_MEMBER_MARKER = re.compile(
     r"<InterpretationMember(?:\s*=\s*(.+))>"
 )
@@ -482,9 +482,9 @@ class TextSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
         elif START_OF_LIBRARY_MARKER.match(first_line):
             state = _LibraryParserStateEnum.header
             match = START_OF_LIBRARY_MARKER.match(first_line)
-            version = match.group(1)
             attributes = AttributeManager()
-            attributes.add_attribute(FORMAT_VERSION_TERM, version)
+            # version = match.group(1)
+            # attributes.add_attribute(FORMAT_VERSION_TERM, version)
             line = stream.readline()
             while _is_header_line(line):
                 nbytes += len(line)
@@ -850,7 +850,7 @@ class TextSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
         return parser.parse(buffer)
 
     def get_spectrum(
-        self, spectrum_number: int = None, spectrum_name: str = None
+        self, spectrum_number: Optional[int] = None, spectrum_name: Optional[str] = None
     ) -> Spectrum:
         # keep the two branches separate for the possibility that this is not
         # possible with all index schemes.
@@ -921,13 +921,13 @@ class TextSpectralLibraryWriter(SpectralLibraryWriterBase):
                 self.handle.write(f"[{attribute.group_id}]{attribute.key}={value}\n")
 
     def write_header(self, library: SpectralLibraryBackendBase):
-        if self.version is None:
-            version = library.attributes.get_by_name("format version")
-            if version is None:
-                version = self.default_version
-        else:
-            version = self.version
-        self.handle.write("<mzSpecLib %s>\n" % (version,))
+        # if self.version is None:
+        #     version = library.attributes.get_by_name("format version")
+        #     if version is None:
+        #         version = self.default_version
+        # else:
+        #     version = self.version
+        self.handle.write("<mzSpecLib>\n")
         self._write_attributes(library.attributes)
         for attr_set in library.spectrum_attribute_sets.values():
             self.write_attribute_set(attr_set, AttributeSetTypes.spectrum)

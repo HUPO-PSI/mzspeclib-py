@@ -1,14 +1,15 @@
 import click
 
 from mzspeclib import SpectrumLibrary
-from mzspeclib.backends import SpectralLibraryBackendBase, FormatInferenceFailure, TextSpectralLibraryWriter
+from mzspeclib.spectrum_library import FormatInferenceFailure
+from mzspeclib.backends import TextSpectralLibraryWriter
 from mzspeclib.cluster import SpectrumCluster
 from mzspeclib.index import MemoryIndex, SQLIndex
 from mzspeclib.spectrum import Spectrum
 
 @click.command('first_n_entries')
 @click.argument('inpath', type=click.Path(exists=True))
-@click.option("-i", "--input-format", type=click.Choice(sorted(SpectralLibraryBackendBase._file_extension_to_implementation)),
+@click.option("-i", "--input-format", type=click.Choice(sorted(SpectrumLibrary.supported_file_extensions())),
               default=None)
 @click.option("-n", '--spectra-to-read', type=int, default=20)
 def main(inpath, input_format, spectra_to_read: int=20):
@@ -18,7 +19,7 @@ def main(inpath, input_format, spectra_to_read: int=20):
         index_type = MemoryIndex
     click.echo(f"Opening {inpath}", err=True)
     try:
-        library = SpectrumLibrary(filename=inpath, index_type=index_type, format=input_format)
+        library = SpectrumLibrary(filename=inpath, index_type=index_type, format=input_format, create_index=False)
     except FormatInferenceFailure as err:
         click.echo(f"{err}", err=True)
         raise click.Abort()

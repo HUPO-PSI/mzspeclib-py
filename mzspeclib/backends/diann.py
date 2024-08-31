@@ -6,7 +6,7 @@ For more information, see `DIA-NN's website <https://github.com/vdemichev/DiaNN`
 import json
 import os
 
-from typing import List, Tuple, Dict, Iterator, Any, Union
+from typing import List, Optional, Tuple, Dict, Iterator, Any, Union
 
 from pyteomics import proforma
 
@@ -131,7 +131,7 @@ class DIANNTSVSpectralLibrary(_CSVSpectralLibraryBackendBase):
         self.index.commit()
         return n
 
-    def _parse_from_buffer(self, buffer: List[Dict[str, Any]], spectrum_index: int = None) -> Spectrum:
+    def _parse_from_buffer(self, buffer: List[Dict[str, Any]], spectrum_index: Optional[int] = None) -> Spectrum:
         spec = self._new_spectrum()
         descr = buffer[0]
 

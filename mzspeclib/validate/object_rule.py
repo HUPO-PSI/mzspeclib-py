@@ -9,6 +9,7 @@ from mzspeclib.spectrum import Spectrum
 from mzspeclib.annotation import IonAnnotationBase, InvalidAnnotation
 
 from mzspeclib.validate.level import RequirementLevel
+from mzspeclib.utils import ValidationWarning
 
 if TYPE_CHECKING:
     from .validator import ValidatorBase
@@ -18,17 +19,20 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
-class ValidationWarning(UserWarning):
-    """
-    Indicates that something was parsed that did not halt the parser but
-    which violates the expectations of the parser.
-
-    The parser will make a best-effort attempt to interpret the value
-    correctly but when validating this will count as a violation.
-    """
-
-
 class ScopedObjectRuleBase:
+    """
+    A validation rule that cannot be expressed in terms of a semantic attribute constraint.
+
+    Attributes
+    ----------
+    id : str
+        A unique identifier for this rule
+    path : str
+        The validation path this rule applies to, e.g. /Library or /Library/Spectrum/Analyte
+    requirement_level : :class:`~.RequirementLevel`
+        How strong the requirement this rule be obeyed is
+    """
+
     id: str
     path: str
     requirement_level: RequirementLevel

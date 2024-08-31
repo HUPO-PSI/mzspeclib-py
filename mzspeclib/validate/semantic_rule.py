@@ -26,6 +26,13 @@ logger.addHandler(logging.NullHandler())
 
 
 class AttributeSemanticPredicate:
+    """
+    A predicate rule that applies to a :class:`~.Attribute` value.
+
+    This is a base class with no specific validation behavior of its
+    own. See its children for specific kinds of predicates.
+    """
+
     name: ClassVar[str]
 
     _registry = {}
@@ -53,6 +60,8 @@ class AttributeSemanticPredicate:
 
 
 class ValueOfType(AttributeSemanticPredicate):
+    """Require that an attribute's value's type is one of the permited kinds."""
+
     type_name: Union[str, List[str]]
 
     name = "value_of_type"
@@ -100,6 +109,11 @@ class ValueOfType(AttributeSemanticPredicate):
 
 
 class ValueIsChildOf(AttributeSemanticPredicate):
+    """
+    Require that the attribute's value is semantically derived from the controlled
+    vocabulary term given by :attr:`accession`.
+    """
+
     accession: str
 
     name = "value_is_child_of"
@@ -129,6 +143,16 @@ class ValueIsChildOf(AttributeSemanticPredicate):
 
 
 class ValueIsUnique(AttributeSemanticPredicate):
+    """
+    Ensure that the value of this attribute is **unique** throughout the library.
+
+    .. note::
+
+        This will store all values encountered in memory, which may be costly
+        for large libraries.
+
+    """
+
     seen: set
 
     name = "value_is_unique"
@@ -159,6 +183,8 @@ class ValueIsUnique(AttributeSemanticPredicate):
 
 
 class ValueMatches(AttributeSemanticPredicate):
+    """Ensure that the value of an attribute matches a specific term"""
+
     accession: str
 
     name = "value_matches"
@@ -187,6 +213,8 @@ class ValueMatches(AttributeSemanticPredicate):
 
 
 class ValueMatchesPattern(AttributeSemanticPredicate):
+    """Ensure that an attribute's value matches a specified regular expression"""
+
     pattern: re.Pattern
 
     name = "value_matches_pattern"
@@ -208,6 +236,16 @@ class ValueMatchesPattern(AttributeSemanticPredicate):
 
 @dataclasses.dataclass(frozen=True)
 class AttributeSemanticRule:
+    """
+    A semantic validation rule that enforces constraints or
+    requirements on a specific controlled vocabulary term-defined
+    :class:`~.Attribute` in an entity.
+
+    This may include enforcing a :class:`AttributeSemanticPredicate`
+    on the value of the attribute, controlling how often an attribute
+    may be used, or what units are assumed for it.
+    """
+
     accession: str
     name: str
     repeatable: bool
@@ -275,6 +313,28 @@ class AttributeSemanticRule:
 
 @dataclasses.dataclass
 class ScopedSemanticRule:
+    """
+    A semantic attribute rule that applies to a specific scope or context
+    in a spectral library.
+
+    Attributes
+    ----------
+    id : str
+        A unique identifier for this rule
+    path : str
+        The validation path this rule applies to, e.g. /Library or /Library/Spectrum/Analyte
+    requirement_level : :class:`~.RequirementLevel`
+        How strong the requirement this rule be obeyed is
+    combination_logic : :class:`~.CombinationLogic`
+        How this rule's attribute rules interact
+    attributes : list[:class:`AttributeSemanticRule`]
+        The attribute rules applied by this semantic rule
+    condition : :class:`AttributeSemanticRule`, optional
+        A pre-condition rule that must be met for this rule to be applied
+    notes : :class:`str`, optional
+        Human-readable description of what this rule enforces or clarifies its intent
+    """
+
     id: str
     path: str
     attributes: List[AttributeSemanticRule]

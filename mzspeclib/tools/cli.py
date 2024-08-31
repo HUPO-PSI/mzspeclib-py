@@ -24,6 +24,15 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 logger = logging.getLogger(__name__)
 
 
+def _input_format_option():
+    return click.option(
+        "-i",
+        "--input-format",
+        type=click.Choice(sorted(SpectralLibraryBackendBase._file_extension_to_implementation)),
+        help="The file format of the input file. If omitted, will attempt to infer automatically.",
+    )
+
+
 def _display_tree(tree, indent: int=0):
     if isinstance(tree, dict):
         if not tree:
@@ -71,17 +80,15 @@ def main(debug_logging=False, log_file: Path=None):
         logging.getLogger().addHandler(handler)
 
     if debug_logging:
-        sys.excepthook = debug_hook
+        sys.excepthook = _debug_hook
 
 
 @main.command("describe", short_help=("Produce a minimal textual description"
                                       " of a spectral library"))
 @click.argument('path', type=click.Path(exists=True))
-@click.option("-d", "--diagnostics", is_flag=True,
-              help="Run more diagnostics, greatly increasing runtime but producing additional information")
-@click.option("-i", "--input-format",
-              type=click.Choice(sorted(SpectralLibraryBackendBase._file_extension_to_implementation)),
-              help='The file format of the input file. If omitted, will attempt to infer automatically.')
+# @click.option("-d", "--diagnostics", is_flag=True,
+#               help="Run more diagnostics, greatly increasing runtime but producing additional information")
+@_input_format_option()
 def describe(path, diagnostics=False, input_format=None):
     """Produce a minimal textual description of a spectral library."""
     click.echo("Describing \"%s\"" % (path,))
@@ -106,7 +113,7 @@ def describe(path, diagnostics=False, input_format=None):
 @main.command("convert", short_help=("Convert a spectral library from one format to another"))
 @click.argument('inpath', type=click.Path(exists=True, allow_dash=False))
 @click.argument("outpath", type=click.Path())
-@click.option("-i", "--input-format", type=click.Choice(sorted(SpectralLibraryBackendBase._file_extension_to_implementation)))
+@_input_format_option()
 @click.option("-f", "--format", type=click.Choice(["text", "json", "msp"]), default="text")
 @click.option("-k", "--library-attribute", "library_attributes", type=(str, str), multiple=True,
               help="Specify an attribute to add to the library metadata section. May be repeated.")
@@ -165,7 +172,7 @@ def convert(inpath, outpath, format=None, header_file=None, library_attributes=(
 
 @main.command("index", short_help="Build an on-disk index for a spectral library")
 @click.argument('inpath', type=click.Path(exists=True))
-@click.option("-i", "--input-format", type=click.Choice(sorted(SpectralLibraryBackendBase._file_extension_to_implementation)))
+@_input_format_option()
 def build_index(inpath, input_format=None):
     """Build an external on-disk SQL-based index for the spectral library"""
     try:
@@ -190,7 +197,7 @@ def _progress_logger(iterable: Iterator[T], label, increment: int=100) -> Iterat
     ["consensus", "single", "silver", "peptide", "gold"],
     case_sensitive=False),
     multiple=True)
-@click.option("-i", "--input-format", type=click.Choice(sorted(SpectralLibraryBackendBase._file_extension_to_implementation)))
+@_input_format_option()
 def validate(inpath, profiles=None, input_format=None):
     """Semantically and structurally validate a spectral library."""
     if profiles is None:
@@ -208,10 +215,7 @@ def validate(inpath, profiles=None, input_format=None):
         raise click.Abort()
 
     logger.info(f"Loading validators...")
-    chain = validator.get_validator_for("base")
-    chain |= validator.ControlledVocabularyAttributeValidator()
-    chain |= validator.get_object_validator_for("base")
-    chain |= validator.get_object_validator_for("peak_annotations")
+    chain = validator.load_default_validator()
     for profile in profiles:
         if profile is None:
             continue
@@ -236,7 +240,7 @@ def validate(inpath, profiles=None, input_format=None):
             logger.log(log_level, f"... {err.message}")
 
 
-def debug_hook(type, value, tb):
+def _debug_hook(type, value, tb):
     if not sys.stderr.isatty():
         click.secho("Running interactively, not starting debugger", fg="yellow")
         sys.__excepthook__(type, value, tb)

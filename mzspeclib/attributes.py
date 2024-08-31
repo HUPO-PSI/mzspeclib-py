@@ -1,3 +1,13 @@
+"""
+.. Controlled Vocabulary Attributes
+.. ================================
+
+Like many PSI file formats, :title-reference:`MzSpecLib` uses controlled vocabulary
+terms to represent properties of entities. Many places in :mod:`mzspeclib`
+use :class:`~.Attribute` to evaluate spectra, but they are also used indirectly
+when interacting with a :class:`~.AttributeManager` as a mapping for key-value pair
+retrieval.
+"""
 import textwrap
 
 from typing import (
@@ -80,19 +90,28 @@ class AttributeManager(object):
     A key-value pair store with optional grouping for storing controlled
     vocabulary-backed attributes.
 
-    Attributes
+    The various components of this object shouldn't be modified directly,
+    and instead rely on the interface this type provides to access its data.
+
+    Parameters
     ----------
-    attributes: List[List]
-        The actual attribute name-value pairs with an optional grouping value
-    attribute_dict: Dict
-        A mapping from attribute name to indices into :attr:`attributes` and
-        the group assignments.
-    group_dict: Dict
-        A mapping from group identifier to indices into :attr:`attributes`
-    group_counter: int
-        The number of attribute groups assigned.
+    attributes : Iterable[list], optional
+        Attribute name-value pairs with an optional grouping value. If omitted,
+        the attribute store will be empty.
 
     """
+
+    # Attributes
+    #     ----------
+    #     attributes: List[List]
+    #         The actual attribute name-value pairs with an optional grouping value
+    #     attribute_dict: Dict
+    #         A mapping from attribute name to indices into :attr:`attributes` and
+    #         the group assignments.
+    #     group_dict: Dict
+    #         A mapping from group identifier to indices into :attr:`attributes`
+    #     group_counter: int
+    #         The number of attribute groups assigned.
 
     attributes: List[Attribute]
     attribute_dict: Dict
@@ -103,14 +122,6 @@ class AttributeManager(object):
     __slots__ = ('attributes', 'attribute_dict', 'group_dict', 'group_counter')
 
     def __init__(self, attributes: Iterable = None):
-        """
-
-        Parameters
-        ----------
-        attributes : Iterable[list], optional
-            Attribute name-value pairs with an optional grouping value. If omitted,
-            the attribute store will be empty.
-        """
         self.attributes = []
 
         # Internal index attributes
@@ -235,12 +246,7 @@ class AttributeManager(object):
             return self.attributes[idx][1]
 
     def get_attribute_group(self, group_identifier: str) -> List[Any]:
-        """
-        Get all the members of a specified attribute group
-
-        .. note::
-
-        """
+        """Get all the members of a specified attribute group"""
         result = []
         group_identifier = str(group_identifier)
         for k, indices_and_groups in self.attribute_dict.items():
@@ -853,6 +859,11 @@ class AttributeSet(AttributedEntity):
 
 
 class AttributeFacet(Generic[T]):
+    """
+    A descriptor that resembles an object, backed by one or more attributes
+    from a :class:`AttributeManager`-like type.
+    """
+
     facet_type: Type[T]
 
     def __init__(self, facet_type: Type[T]):

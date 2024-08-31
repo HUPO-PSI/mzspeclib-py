@@ -1,4 +1,3 @@
-import datetime
 import itertools
 import logging
 import warnings
@@ -28,7 +27,7 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
-def walk_children(term: Entity):
+def _walk_children(term: Entity):
     queue = Deque([term])
     while queue:
         term = queue.popleft()
@@ -197,6 +196,13 @@ class ValidatorBase(_VocabularyResolverMixin):
         return result
 
     def chain(self, validator: 'ValidatorBase') -> 'ValidatorBase':
+        """
+        Combine this validator with another validator, applying both rulesets.
+
+        See Also
+        --------
+        ValidatorChain
+        """
         return ValidatorChain([self, validator])
 
     def __or__(self, other: 'ValidatorBase') -> 'ValidatorBase':
@@ -204,13 +210,13 @@ class ValidatorBase(_VocabularyResolverMixin):
 
     def walk_terms_for(self, curie: str) -> Iterator[str]:
         term = self.find_term_for(curie)
-        for entity in walk_children(term):
+        for entity in _walk_children(term):
             yield f"{entity.id}|{entity.name}"
 
 
 INTENSITY_UNITS = ("MS:1000131", "MS:1000132", "MS:1000905", " MS:1000814", "UO:0000269")
 
-def is_intensity_units(units: List):
+def _is_intensity_units(units: List):
     for unit_rel in units:
         if unit_rel.accession in INTENSITY_UNITS:
             return True
@@ -300,7 +306,7 @@ class ControlledVocabularyAttributeValidator(ValidatorBase):
             if not isinstance(units, list):
                 units = [units]
 
-            is_intensity_measure = is_intensity_units(units)
+            is_intensity_measure = _is_intensity_units(units)
 
             if attrib.group_id is not None:
                 try:
@@ -387,7 +393,7 @@ class ValidationError:
         return hash((self.path, self.identifier_path, self.attribute, self.message))
 
 
-class Validator(ValidatorBase):
+class RuleValidator(ValidatorBase):
     name: str
     semantic_rules: List[ScopedSemanticRule]
     object_rules: List[ScopedObjectRuleBase]
@@ -487,14 +493,24 @@ object_rules = {
 }
 
 
-def get_validator_for(name: str) -> Validator:
+def get_validator_for(name: str) -> RuleValidator:
+    """Load a :class:`RuleValidator` with semantic rules for the given rule profile"""
     rules = load_rule_set(name)
-    validator = Validator(name, rules)
+    validator = RuleValidator(name, rules)
     return validator
 
 
-def get_object_validator_for(name: str) -> Validator:
+def get_object_validator_for(name: str) -> RuleValidator:
+    """Prepare a :class:`RuleValidator` configured with the object rules for the given rule profile"""
     rules = object_rules[name]
-    validator = Validator(name, object_rules=rules)
+    validator = RuleValidator(name, object_rules=rules)
     return validator
 
+
+def load_default_validator() -> ValidatorChain:
+    """Load the core :class:`RuleValidator` and add all the basic object rules for library validation"""
+    chain = get_validator_for("base")
+    chain |= ControlledVocabularyAttributeValidator()
+    chain |= get_object_validator_for("base")
+    chain |= get_object_validator_for("peak_annotations")
+    return chain

@@ -54,7 +54,7 @@ class JSONSpectralLibrary(SpectralLibraryBackendBase):
 
         Unlike other formats readers, this type does not parse incrementally, it instead
         parses the entire JSON document in-memory and stores the parsed object structure.
-        The JSON objects are then converted into :mod:`mzlib` types upon request. This is
+        The JSON objects are then converted into :mod:`mzspeclib` types upon request. This is
         because incremental JSON parsing is substantially more difficult to do in a byte
         aware manner, not to mention slow, in Python.
 

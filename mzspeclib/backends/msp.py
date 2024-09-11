@@ -467,7 +467,7 @@ other_terms = CaseInsensitiveDict(
         "Sample": "MS:1000002|sample name",
         "Filter": "MS:1000512|filter string",
         "FTResolution": "MS:1000028|detector resolution",
-        "ms1PrecursorAb": "MS:1003085|previous MS1 scan precursor intensity",
+        "ms1PrecursorAb": "MS:1003085|previous MSn-1 scan precursor intensity",
         "Precursor1MaxAb": "MS:1003086|precursor apex intensity",
         "Purity": "MS:1009013|isolation window precursor purity",
         "Num peaks": "MS:1003059|number of peaks",
@@ -875,7 +875,17 @@ def normalized_collision_energy_handler(key: str, value: str, container: Attribu
 @FunctionAttributeHandler.wraps("RT", "rettime", "retentiontime", "rtinseconds")
 def rt_handler(key, value, container) -> bool:
     if not isinstance(value, str):
-        container.add_attribute("MS:1000894|retention time", try_cast(value))
+        if key.lower() == 'rtinseconds':
+            group_identifier = container.get_next_group_identifier()
+            container.add_attribute(
+                "MS:1000894|retention time",
+                try_cast(value),
+                group_identifier,
+            )
+            container.add_attribute("UO:0000000|unit", "UO:0000010|second", group_identifier)
+        else:
+            warnings.warn(f"Unable to infer retention time unit from {key!r}")
+            container.add_attribute("MS:1000894|retention time", try_cast(value))
         return True
     else:
         match = re.match(r"([\d\.]+)\s*(\D*)", value)

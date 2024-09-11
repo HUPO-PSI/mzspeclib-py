@@ -103,9 +103,14 @@ class SpectronautTSVSpectralLibrary(_CSVSpectralLibraryBackendBase):
     def __init__(self, filename: str, index_type=None, **kwargs):
         super().__init__(filename, index_type=index_type, delimiter='\t', **kwargs)
 
-    def _spectrum_type(self):
+    def _spectrum_origin_type(self):
         key = "MS:1003072|spectrum origin type"
         value = "MS:1003073|observed spectrum"
+        return key, value
+
+    def _spectrum_aggregation_type(self):
+        key = "MS:1003065|spectrum aggregation type"
+        value = "MS:1003067|consensus spectrum"
         return key, value
 
     def read_header(self) -> bool:
@@ -267,7 +272,8 @@ class SpectronautTSVSpectralLibrary(_CSVSpectralLibraryBackendBase):
         # Charge does not belong in the spectrum
         # spec.add_attribute(CHARGE_STATE, int(descr['PrecursorCharge']))
         spec.add_attribute(SOURCE_FILE, urlify(descr['ReferenceRun']))
-        spec.add_attribute(*self._spectrum_type())
+        spec.add_attribute(*self._spectrum_origin_type())
+        spec.add_attribute(*self._spectrum_aggregation_type())
 
         spec.add_attribute_group([
             [CUSTOM_ATTRIBUTE_NAME, "LabeledPeptide"],
@@ -279,7 +285,13 @@ class SpectronautTSVSpectralLibrary(_CSVSpectralLibraryBackendBase):
         if 'CV' in descr:
             spec.add_attribute("MS:1001581|FAIMS compensation voltage", float(descr['CV']))
         if 'iRT' in descr:
-            spec.add_attribute("MS:1000896|normalized retention time", float(descr['iRT']))
+            group_id = spec.get_next_group_identifier()
+            spec.add_attribute("MS:1000896|normalized retention time", float(descr['iRT']), group_identifier=group_id)
+            spec.add_attribute(
+                "UO:0000000|unit",
+                "UO:0000031|minute",
+                group_identifier=group_id,
+            )
 
         analyte = self._new_analyte('1')
         self._build_analyte(descr, analyte)

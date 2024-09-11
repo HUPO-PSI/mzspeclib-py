@@ -150,6 +150,14 @@ class ValidatorBase(_VocabularyResolverMixin):
             result = False
             for parsing_warning in parsing_warnings:
                 logger.warn(str(parsing_warning.message))
+                self.add_warning(
+                    spectrum,
+                    path,
+                    identifier_path,
+                    '',
+                    RequirementLevel.must,
+                    parsing_warning.message
+                )
 
         for _key, analyte in spectrum.analytes.items():
             result &= self.validate_analyte(analyte, path, spectrum, library)
@@ -325,6 +333,8 @@ class ControlledVocabularyAttributeValidator(ValidatorBase):
             if not unit_attrib and is_intensity_measure:
                 try:
                     unit_attrib = obj.get_attribute("MS:1000043|intensity unit", raw=True)
+                    if isinstance(unit_attrib, list):
+                        unit_attrib = unit_attrib[0]
                 except KeyError:
                     pass
 
@@ -368,10 +378,61 @@ class ControlledVocabularyAttributeValidator(ValidatorBase):
             if self.current_context.visited_attribute(attrib):
                 continue
             try:
-                term = self.find_term_for(attrib.key.split("|")[0])
+                acc, name = attrib.key.split("|", 1)
+                term = self.find_term_for(acc)
+                try:
+                    term_by_name = self.find_term_by_name(name)
+                except KeyError:
+                    term_by_name = None
+                if term != term_by_name and term_by_name is not None:
+                    self.add_warning(
+                        obj,
+                        path,
+                        identifier_path,
+                        attrib.key,
+                        attrib.value,
+                        RequirementLevel.must,
+                        f'{attrib.key}\'s accession {acc} resolved to "{term.id}|{term.name}", '
+                        f'but it\'s name "{name}" resolved to "{term_by_name.id}|{term_by_name.name}"',
+                    )
+                    valid = False
+                elif term_by_name is None:
+                    self.add_warning(
+                        obj,
+                        path,
+                        identifier_path,
+                        attrib.key,
+                        attrib.value,
+                        RequirementLevel.must,
+                        f'{attrib.key}\'s accession {acc} resolved to "{term.id}|{term.name}", '
+                        f'but it\'s name "{name}" did not resolve',
+                    )
+                    valid = False
             except KeyError:
-                logger.warn(f"Could not resolve term for {attrib.key}")
+                logger.warn(f"Could not resolve term for {attrib.key} at {path} {identifier_path}")
+                valid = False
+                self.add_warning(
+                    obj,
+                    path,
+                    identifier_path,
+                    attrib,
+                    None,
+                    RequirementLevel.must,
+                    f"Could not resolve term for {attrib.key} at {path} {identifier_path}",
+                )
                 continue
+            except ValueError:
+                logger.error(f"Could not parse {attrib.key} at {path} {identifier_path}", exc_info=True)
+                valid = False
+                self.add_warning(
+                    obj,
+                    path,
+                    identifier_path,
+                    attrib,
+                    None,
+                    RequirementLevel.must,
+                    f"Could not parse {attrib.key} at {path} {identifier_path}",
+                )
 
             valid &= self._check_value_types(obj, path, identifier_path, attrib, term)
             valid &= self._check_units(obj, path, identifier_path, attrib, term)

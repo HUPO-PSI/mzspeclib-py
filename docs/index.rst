@@ -10,3 +10,4 @@
    Home <self>
    api
    cli
+   examples

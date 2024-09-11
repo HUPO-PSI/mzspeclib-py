@@ -1,3 +1,4 @@
+"""Example script to write out the first n spectra from a library"""
 import click
 
 from mzspeclib import SpectrumLibrary
@@ -13,6 +14,7 @@ from mzspeclib.spectrum import Spectrum
               default=None)
 @click.option("-n", '--spectra-to-read', type=int, default=20)
 def main(inpath, input_format, spectra_to_read: int=20):
+    """Read only the first `n` spectra from the input library and write them to STDOUT in text format"""
     if SQLIndex.exists(inpath):
         index_type = SQLIndex
     else:

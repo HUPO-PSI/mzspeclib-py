@@ -17,24 +17,29 @@ from typing import (
     Generic, TypeVar, Type
 )
 
+from dataclasses import dataclass
+
+from . import const
 
 T = TypeVar('T')
 
 
 class Attribute(object):
     __slots__ = ("key", "value", "group_id", "owner_id")
+
     key: str
     value: Union[str, int, float, 'Attribute', List]
     group_id: Optional[str]
-    owner_id: Any
+    owner_id: Optional[Any]
 
-    def __init__(self, key, value, group_id=None, owner_id=-1):
+    def __init__(self, key, value, group_id=None, owner_id=None):
         self.key = key
         self.value = value
         self.group_id = group_id
         self.owner_id = owner_id
 
     def copy(self):
+        """Create a shallow copy of this :class:`Attribute`"""
         return self.__class__(self.key, self.value, self.group_id, self.owner_id)
 
     def __getitem__(self, i):
@@ -52,8 +57,7 @@ class Attribute(object):
     def __iter__(self):
         yield self.key
         yield self.value
-        if self.group_id:
-            yield self.group_id
+        yield self.group_id
         yield self.owner_id
 
     def __len__(self):
@@ -144,27 +148,16 @@ class AttributeManager(object):
         self.group_counter += 1
         return str(next_value)
 
-    #### Add an attribute to the list and update the lookup tables
-    def add_attribute(self, key: str, value, group_identifier: Optional[str] = None):
-        """
-        Add an attribute to the list and update the lookup tables
-
-        Parameters
-        ----------
-        key : str
-            The name of the attribute to add
-        value : object
-            The value of the attribute to add
-        group_identifier : str, optional
-            The attribute group identifier to use, if any. If not provided,
-            no group is assumed.
-        """
+    def _add_attribute_raw(self, attr: Attribute):
+        key = attr.key
+        group_identifier = attr.group_id
         if group_identifier is not None:
             int_group_identifier = int(group_identifier)
             if int_group_identifier <= self.group_counter:
                 self.group_counter = int_group_identifier + 1
-        items = Attribute(key, value, group_identifier)
-        self.attributes.append(items)
+            attr.group_id = group_identifier
+
+        self.attributes.append(attr)
         index = len(self.attributes) - 1
 
         #### If there is already one of these, add it to the lists in attribute_dict
@@ -190,7 +183,29 @@ class AttributeManager(object):
             else:
                 self.group_dict[group_identifier] = [index]
 
-    def add_attribute_group(self, attributes: List[Union[Attribute, Tuple[str, Any]]]):
+    #### Add an attribute to the list and update the lookup tables
+    def add_attribute(self, key: str, value, group_identifier: Optional[str] = None, owner_id: Optional[Any] = None):
+        """
+        Add an attribute to the list and update the lookup tables
+
+        Parameters
+        ----------
+        key : str
+            The name of the attribute to add
+        value : object
+            The value of the attribute to add
+        group_identifier : str, optional
+            The attribute group identifier to use, if any. If not provided,
+            no group is assumed.
+        """
+        if group_identifier is not None:
+            int_group_identifier = int(group_identifier)
+            if int_group_identifier <= self.group_counter:
+                self.group_counter = int_group_identifier + 1
+        attr = Attribute(key, value, group_identifier, owner_id=owner_id)
+        self._add_attribute_raw(attr)
+
+    def add_attribute_group(self, attributes: List[Union[Attribute, Tuple[str, Any]]], owner_id: Optional[Any]=None):
         """Add a collection of connected attributes that are part of a single group"""
         group_id = self.get_next_group_identifier()
         for attr in attributes:
@@ -199,7 +214,7 @@ class AttributeManager(object):
                 value = attr.value
             else:
                 key, value = attr
-            self.add_attribute(key, value, group_id)
+            self.add_attribute(key, value, group_id, owner_id)
 
     def get_attribute(self, key: str, group_identifier: Optional[str] = None,
                       raw: bool = False) -> Union[Any, List[Any], Attribute,
@@ -255,11 +270,11 @@ class AttributeManager(object):
                     result.append(self.attributes[i])
         return result
 
-    def replace_attribute(self, key, value, group_identifier=None):
+    def replace_attribute(self, key, value, group_identifier=None, owner_id=None):
         try:
             indices_and_groups = self.attribute_dict[key]
         except KeyError:
-            return self.add_attribute(key, value, group_identifier=group_identifier)
+            return self.add_attribute(key, value, group_identifier=group_identifier, owner_id=owner_id)
         if group_identifier is None:
             indices = indices_and_groups['indexes']
             if len(indices) > 1:
@@ -428,16 +443,21 @@ class AttributeManager(object):
     def _from_iterable(self, attributes):
         mapping = {}
         for attrib in attributes:
-            if len(attrib) == 3:
+            if not isinstance(attrib, Attribute):
+                attrib = Attribute(*attrib)
+            else:
+                attrib = attrib.copy()
+            if attrib.group_id is not None:
                 # this is a grouped attribute
-                if attrib[2] in mapping:
-                    remap = mapping[attrib[2]]
+                if attrib.group_id in mapping:
+                    remap = mapping[attrib.group_id]
                 else:
                     remap = self.get_next_group_identifier()
-                    mapping[attrib[2]] = remap
-                self.add_attribute(attrib[0], attrib[1], remap)
+                    mapping[attrib.group_id] = remap
+                attrib.group_id = remap
+                self._add_attribute_raw(attrib)
             else:
-                self.add_attribute(attrib[0], attrib[1])
+                self._add_attribute_raw(attrib)
 
     def _attributes_from_iterable(self, attributes):
         return self._from_iterable(attributes)
@@ -445,6 +465,15 @@ class AttributeManager(object):
     def copy(self):
         """Make a deep copy of the object"""
         return self.__class__(self.attributes)
+
+    @property
+    def attribute_sets(self):
+        if not self.has_attribute(const.ATTRIBUTE_SET_NAME):
+            return []
+        attr_sets = self.get_attribute(const.ATTRIBUTE_SET_NAME)
+        if not isinstance(attr_sets, list):
+            attr_sets = [attr_sets]
+        return attr_sets
 
     def __repr__(self):
         if len(self) == 0:
@@ -560,6 +589,10 @@ class _ReadAttributes(object):
     def _iter_attributes(self) -> Iterator[Attribute]:
         return self.attributes._iter_attributes()
 
+    @property
+    def attribute_sets(self):
+        return self.attributes.attribute_sets
+
 
 class _WriteAttributes(object):
     """
@@ -589,8 +622,20 @@ class _WriteAttributes(object):
         """
         return self.attributes.add_attribute(key, value, group_identifier=group_identifier)
 
-    def add_attribute_group(self, attributes: List[Union[Attribute, Tuple[str, Any]]]):
-        self.attributes.add_attribute_group(attributes)
+    def add_attribute_group(self, attributes: List[Union[Attribute, Tuple[str, Any]]], owner_id: Optional[Any]):
+        """Add a collection of connected attributes that are part of a single group"""
+        self.attributes.add_attribute_group(attributes, owner_id=owner_id)
+
+    def get_next_group_identifier(self) -> str:
+        """
+        Retrieve the next un-used attribute group identifier
+        and increment the internal counter.
+
+        Returns
+        -------
+        str
+        """
+        return self.attributes.get_next_group_identifier()
 
     def replace_attribute(self, key, value, group_identifier=None):
         return self.attributes.replace_attribute(key, value, group_identifier=group_identifier)
@@ -818,35 +863,42 @@ class AttributeSet(AttributedEntity):
                 return False
         return True
 
-    def apply(self, target: Attributed):
+    def remove(self, target: Attributed, group_identifier: Optional[str]=None):
+        for attr in self.attributes:
+            target.remove_attribute(attr.key, attr.value, group_identifier)
 
-        terms_to_remove: List[Tuple[str, Union[Attribute, List[Attribute]]]] = []
-        for key in self.attributes.keys():
-            if target.has_attribute(key):
-                terms_to_remove.append((key, target.get_attribute(key, raw=True)))
+    def apply(self, target: Attributed, group_identifier: Optional[str]=None):
+        if group_identifier is not None:
+            for attr in self.attributes:
+                target.add_attribute(attr.key, attr.value, group_identifier, owner_id=self.name)
+        else:
+            terms_to_remove: List[Tuple[str, Union[Attribute, List[Attribute]]]] = []
+            for key in self.attributes.keys():
+                if target.has_attribute(key):
+                    terms_to_remove.append((key, target.get_attribute(key, raw=True)))
 
-        group_ids = DefaultDict(int)
-        for key, terms in terms_to_remove:
-            if isinstance(terms, list):
-                for term in terms:
+            group_ids = DefaultDict(int)
+            for key, terms in terms_to_remove:
+                if isinstance(terms, list):
+                    for term in terms:
+                        if term.group_id:
+                            group_ids[term.group_id] += 1
+                        target.remove_attribute(key, group_identifier=term.group_id)
+                else:
+                    term = terms
                     if term.group_id:
                         group_ids[term.group_id] += 1
                     target.remove_attribute(key, group_identifier=term.group_id)
-            else:
-                term = terms
-                if term.group_id:
-                    group_ids[term.group_id] += 1
-                target.remove_attribute(key, group_identifier=term.group_id)
 
-        for group_id in group_ids:
-            target._remove_attribute_group(group_id)
+            for group_identifier in group_ids:
+                target._remove_attribute_group(group_identifier)
 
-        for group_id, attrs in self._iter_attribute_groups():
-            if group_id is None:
-                for a in attrs:
-                    target.add_attribute(a.key, a.value, group_identifier=None)
-            else:
-                target.add_attribute_group(attrs)
+            for group_identifier, attrs in self._iter_attribute_groups():
+                if group_identifier is None:
+                    for a in attrs:
+                        target.add_attribute(a.key, a.value, group_identifier=None, owner_id=self.name)
+                else:
+                    target.add_attribute_group(attrs)
 
     def __repr__(self):
         template = f"{self.__class__.__name__}(name={self.name}, "
@@ -856,6 +908,26 @@ class AttributeSet(AttributedEntity):
             return template
         template += "[\n%s])" % textwrap.indent(',\n'.join(lines), ' ' * 2)
         return template
+
+
+@dataclass
+class AttributeSetRef:
+    attribute_set: AttributeSet
+    group_id: str
+
+    @property
+    def name(self):
+        return self.attribute_set.name
+
+    def apply(self, target: Attributed, group_identifier: Optional[str] = None):
+        if group_identifier is None:
+            group_identifier = self.group_id
+        return self.attribute_set.apply(target, group_identifier)
+
+    def remove(self, target: Attributed, group_identifier: Optional[str]=None):
+        if group_identifier is None:
+            group_identifier = self.group_id
+        return self.attribute_set.remove(target, group_identifier)
 
 
 class AttributeFacet(Generic[T]):

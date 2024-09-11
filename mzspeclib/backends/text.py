@@ -14,11 +14,12 @@ from typing import ClassVar, List, Optional, Tuple, Union, Iterable
 from mzspeclib.annotation import parse_annotation
 from mzspeclib.spectrum import Spectrum
 from mzspeclib.cluster import SpectrumCluster
-from mzspeclib.attributes import Attribute, AttributeManager, Attributed, AttributeSet
+from mzspeclib.attributes import Attribute, AttributeManager, AttributeSetRef, Attributed, AttributeSet
 from mzspeclib.analyte import Analyte, Interpretation, InterpretationMember
 from mzspeclib.utils import ValidationWarning
 
 from .base import (
+    DEFAULT_VERSION,
     SpectralLibraryBackendBase,
     _PlainTextSpectralLibraryBackendBase,
     SpectralLibraryWriterBase,
@@ -483,8 +484,13 @@ class TextSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
             state = _LibraryParserStateEnum.header
             match = START_OF_LIBRARY_MARKER.match(first_line)
             attributes = AttributeManager()
-            # version = match.group(1)
-            # attributes.add_attribute(FORMAT_VERSION_TERM, version)
+            version_in_header = match.group(1)
+            if version_in_header:
+                warnings.warn(
+                    f"Library format header contains version tag {version_in_header}, this is no longer "
+                    "part of the specification and is ignored.",
+                    category=ValidationWarning,
+                )
             line = stream.readline()
             while _is_header_line(line):
                 nbytes += len(line)
@@ -575,6 +581,9 @@ class TextSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
                 self._add_attribute_set(
                     current_attribute_set, current_attribute_set_type
                 )
+            if not attributes.has_attribute(FORMAT_VERSION_TERM):
+                warnings.warn(f"Library does not have a {FORMAT_VERSION_TERM}, assuming current version", category=ValidationWarning)
+                attributes = [Attribute(FORMAT_VERSION_TERM, DEFAULT_VERSION)] + list(attributes)
             self.attributes.clear()
             self.attributes._from_iterable(attributes)
             return True, nbytes
@@ -776,6 +785,20 @@ class TextSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
         except KeyError:
             match["value"] = try_cast(value)
 
+    def _map_attribute_set(self, name: str, scope: _Scope) -> AttributeSet:
+        attr_set = None
+        if _SpectrumParserStateEnum.header == scope.state:
+            attr_set = self.spectrum_attribute_sets[name]
+        elif _SpectrumParserStateEnum.analyte == scope.state:
+            attr_set = self.analyte_attribute_sets[name]
+        elif _SpectrumParserStateEnum.interpretation == scope.state:
+            attr_set = self.interpretation_attribute_sets[name]
+        elif _SpectrumParserStateEnum.cluster == scope.state:
+            attr_set = self.cluster_attribute_sets[name]
+        else:
+            raise ValueError(f"Cannot define attribute sets for {scope.state}")
+        return attr_set
+
     def _parse_attribute(
         self, line: str, line_number_message=lambda: "", scope: Optional[_Scope] = None
     ) -> Union[Attribute, AttributeSet]:
@@ -786,17 +809,8 @@ class TextSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
             d = match.groupdict()
             self._prepare_attribute_dict(d)
             if d["term"] == ATTRIBUTE_SET_NAME:
-                if _SpectrumParserStateEnum.header == scope.state:
-                    attr_set = self.spectrum_attribute_sets[d["value"]]
-                elif _SpectrumParserStateEnum.analyte == scope.state:
-                    attr_set = self.analyte_attribute_sets[d["value"]]
-                elif _SpectrumParserStateEnum.interpretation == scope.state:
-                    attr_set = self.interpretation_attribute_sets[d["value"]]
-                elif _SpectrumParserStateEnum.cluster == scope.state:
-                    attr_set = self.cluster_attribute_sets[d["value"]]
-                else:
-                    raise ValueError(f"Cannot define attribute sets for {scope.state}")
-                return attr_set
+                attr_set = self._map_attribute_set(d['value'], scope)
+                return AttributeSetRef(attr_set, None)
             attr = Attribute(d["term"], d["value"])
             return attr
         elif line.startswith("["):
@@ -804,6 +818,9 @@ class TextSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
             if match is not None:
                 d = match.groupdict()
                 self._prepare_attribute_dict(d)
+                if d["term"] == ATTRIBUTE_SET_NAME:
+                    attr_set = self._map_attribute_set(d["value"], scope)
+                    return AttributeSetRef(attr_set, d['group_id'])
                 attr = Attribute(d["term"], d["value"], d["group_id"])
                 return attr
             else:
@@ -827,8 +844,21 @@ class TextSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
         if scope is None:
             scope = _Scope(None, None)
         attr = self._parse_attribute(line, line_number_message, scope)
-        if isinstance(attr, AttributeSet):
-            attr.apply(store)
+        if isinstance(attr, (AttributeSet, AttributeSetRef)):
+            group_id = getattr(attr, 'group_id', None)
+            if group_id is not None:
+                if group_id != scope.attribute_group:
+                    scope.attribute_group = group_id
+                    scope.working_attribute_group = store.get_next_group_identifier()
+                    attr.group_id = scope.working_attribute_group
+                else:
+                    attr.group_id = scope.working_attribute_group
+            store.add_attribute(
+                ATTRIBUTE_SET_NAME,
+                attr.name,
+                group_identifier=attr.group_id
+            )
+            attr.apply(store, attr.group_id)
         else:
             if attr.group_id:
                 if attr.group_id != scope.attribute_group:
@@ -906,8 +936,12 @@ class TextSpectralLibraryWriter(SpectralLibraryWriterBase):
         self._coerce_handle(self.filename)
         self.compact_interpretations = compact_interpretations
 
-    def _write_attributes(self, attributes: Attributed):
+    def _write_attributes(self, attributes: Attributed, attribute_sets: Optional[List[str]]=None):
+        if attribute_sets is None:
+            attribute_sets = []
         for attribute in attributes:
+            if attribute.owner_id and attribute.owner_id in attribute_sets or attribute.owner_id == "all":
+                continue
             value = attribute.value
             if ":" in attribute.key:
                 try:
@@ -921,24 +955,19 @@ class TextSpectralLibraryWriter(SpectralLibraryWriterBase):
                 self.handle.write(f"[{attribute.group_id}]{attribute.key}={value}\n")
 
     def write_header(self, library: SpectralLibraryBackendBase):
-        # if self.version is None:
-        #     version = library.attributes.get_by_name("format version")
-        #     if version is None:
-        #         version = self.default_version
-        # else:
-        #     version = self.version
+        """Write the library header and other global metadata"""
         self.handle.write("<mzSpecLib>\n")
         self._write_attributes(library.attributes)
         for attr_set in library.spectrum_attribute_sets.values():
-            self.write_attribute_set(attr_set, AttributeSetTypes.spectrum)
+            self._write_attribute_set(attr_set, AttributeSetTypes.spectrum)
 
         for attr_set in library.analyte_attribute_sets.values():
-            self.write_attribute_set(attr_set, AttributeSetTypes.analyte)
+            self._write_attribute_set(attr_set, AttributeSetTypes.analyte)
 
         for attr_set in library.interpretation_attribute_sets.values():
-            self.write_attribute_set(attr_set, AttributeSetTypes.interpretation)
+            self._write_attribute_set(attr_set, AttributeSetTypes.interpretation)
 
-    def write_attribute_set(
+    def _write_attribute_set(
         self, attribute_set: AttributeSet, attribute_set_type: AttributeSetTypes
     ):
         if attribute_set_type == AttributeSetTypes.spectrum:
@@ -961,10 +990,10 @@ class TextSpectralLibraryWriter(SpectralLibraryWriterBase):
         attribs_of = list(
             self._filter_attributes(spectrum, self._not_entry_key_or_index)
         )
-        self._write_attributes(attribs_of)
+        self._write_attributes(attribs_of, spectrum.attribute_sets)
         for analyte in spectrum.analytes.values():
             self.handle.write(f"<Analyte={analyte.id}>\n")
-            self._write_attributes(analyte.attributes)
+            self._write_attributes(analyte.attributes, analyte.attribute_sets)
         _n_interps = len(spectrum.interpretations)
         for interpretation in spectrum.interpretations.values():
             interpretation: Interpretation
@@ -982,7 +1011,7 @@ class TextSpectralLibraryWriter(SpectralLibraryWriterBase):
                 continue
 
             self.handle.write(f"<Interpretation={interpretation.id}>\n")
-            self._write_attributes(attribs_of)
+            self._write_attributes(attribs_of, interpretation.attribute_sets)
 
             # When there is only one interpretation and only one interpretation member
             # interpretation member attributes are written out as part of the interpretation
@@ -993,12 +1022,12 @@ class TextSpectralLibraryWriter(SpectralLibraryWriterBase):
                 and self.compact_interpretations
             ):
                 for member in interpretation.member_interpretations.values():
-                    self._write_attributes(member.attributes)
+                    self._write_attributes(member.attributes, member.attribute_sets)
             else:
                 for member in interpretation.member_interpretations.values():
                     member: InterpretationMember
                     self.handle.write(f"<InterpretationMember={member.id}>\n")
-                    self._write_attributes(member.attributes)
+                    self._write_attributes(member.attributes, member.attribute_sets)
         self.handle.write("<Peaks>\n")
         for peak in spectrum.peak_list:
             peak_parts = [
@@ -1007,7 +1036,7 @@ class TextSpectralLibraryWriter(SpectralLibraryWriterBase):
                 "?" if not peak[2] else ",".join(map(str, peak[2])),
             ]
             if peak[3]:
-                peak_parts.append("\t".join(map(format_aggregation, peak[3])))
+                peak_parts.append("\t".join(map(_format_aggregation, peak[3])))
             self.handle.write("\t".join(peak_parts) + "\n")
         self.handle.write("\n")
 
@@ -1024,7 +1053,7 @@ class TextSpectralLibraryWriter(SpectralLibraryWriterBase):
             self.handle.close()
 
 
-def format_aggregation(value: Union[numbers.Number, str]) -> str:
+def _format_aggregation(value: Union[numbers.Number, str]) -> str:
     if isinstance(value, numbers.Number):
         return "%0.4g" % value
     else:

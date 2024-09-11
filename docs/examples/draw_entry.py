@@ -1,3 +1,5 @@
+"""Draw an example spectrum"""
+
 import sys
 import matplotlib
 matplotlib.use("agg")
@@ -9,6 +11,7 @@ from mzspeclib.draw import draw_spectrum
 
 
 def main(path, spectrum_key):
+    """Read spectrum `path`, select `spectrum_key` and render that spectrum to PDF"""
     lib = SpectrumLibrary(filename=path)
     spec = lib.get_spectrum(spectrum_number=spectrum_key)
     draw_spectrum(spec)

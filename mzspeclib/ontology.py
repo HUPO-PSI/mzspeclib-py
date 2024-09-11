@@ -49,9 +49,9 @@ class _VocabularyResolverMixin(object):
 
     def find_term_for(self, curie: str) -> Entity:
         try:
-            name, _id = curie.split(":")
+            name, _id = curie.split(":", 1)
         except ValueError as err:
-            raise KeyError(curie) from err
+            raise ValueError(f"Could not parse {curie} into source and accession. Is it a CURIE?") from None
         cv = self.load_cv(name)
         term = cv[curie]
         return term

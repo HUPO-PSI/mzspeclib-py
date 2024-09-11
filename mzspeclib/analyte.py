@@ -5,16 +5,8 @@ from typing import Iterable, KeysView, ItemsView, Optional, ValuesView, Dict, Mu
 from pyteomics import proforma
 
 from mzspeclib.attributes import AttributedEntity, IdentifiedAttributeManager, AttributeManagedProperty, AttributeProxy, AttributeGroupFacet
+from mzspeclib.const import (ANALYTE_MIXTURE_TERM, CHARGE_STATE, PROFORMA_ION, PROFORMA_SEQ, STRIPPED_PEPTIDE_SEQ, FIRST_ANALYTE_KEY, FIRST_INTERPRETATION_KEY)
 
-
-FIRST_ANALYTE_KEY = '1'
-FIRST_INTERPRETATION_KEY = '1'
-
-ANALYTE_MIXTURE_TERM = "MS:1003163|analyte mixture members"
-CHARGE_STATE = "MS:1000041|charge state"
-PROFORMA_ION = "MS:1003270|proforma peptidoform ion notation"
-PROFORMA_SEQ = "MS:1000889|proforma peptidoform sequence"
-STRIPPED_PEPTIDE_SEQ = "MS:1000888|stripped peptide sequence"
 
 class _AnalyteMappingProxy(Mapping[str, 'Analyte']):
     parent: Mapping[str, 'Interpretation']

@@ -9,17 +9,12 @@ from mzspeclib.attributes import (
     AttributeProxy as _AttributeProxy, AttributeFacet
 )
 from mzspeclib.analyte import Analyte, InterpretationCollection, Interpretation
+from .const import (SPECTRUM_NAME, LIBRARY_SPECTRUM_INDEX, LIBRARY_SPECTRUM_KEY, PRECURSOR_MZ, CHARGE_STATE)
 
 if TYPE_CHECKING:
     from mzspeclib.spectrum_library import SpectrumLibrary
 
 #A class that holds data for each spectrum that is read from the SpectralLibrary class
-
-SPECTRUM_NAME = "MS:1003061|library spectrum name"
-LIBRARY_SPECTRUM_KEY = "MS:1003237|library spectrum key"
-LIBRARY_SPECTRUM_INDEX = "MS:1003062|library spectrum index"
-PRECURSOR_MZ = "MS:1003208|experimental precursor monoisotopic m/z"
-CHARGE_STATE = "MS:1000041|charge state"
 
 
 class SpectrumAggregation(_AttributeProxy):

@@ -67,8 +67,13 @@ class DIANNTSVSpectralLibrary(_CSVSpectralLibraryBackendBase):
     def __init__(self, filename: str, index_type=None, **kwargs):
         super().__init__(filename, index_type=index_type, delimiter='\t', **kwargs)
 
-    def _spectrum_type(self):
+    def _spectrum_origin_type(self):
         key = "MS:1003072|spectrum origin type"
+        value = "MS:1003074|predicted spectrum"
+        return key, value
+
+    def _spectrum_aggregation_type(self):
+        key = "MS:1003065|spectrum aggregation type"
         value = "MS:1003074|predicted spectrum"
         return key, value
 
@@ -140,10 +145,13 @@ class DIANNTSVSpectralLibrary(_CSVSpectralLibraryBackendBase):
 
         if 'FileName' in descr:
             spec.add_attribute(SOURCE_FILE, urlify(descr['FileName']))
-        spec.add_attribute(*self._spectrum_type())
 
         if 'decoy' in descr and int(descr['decoy']):
             spec.add_attribute("MS:1003072|spectrum origin type", "MS:1003192|decoy spectrum")
+        else:
+            spec.add_attribute(*self._spectrum_origin_type())
+
+        spec.add_attribute(*self._spectrum_aggregation_type())
 
         if 'IonMobility' in descr:
             spec.add_attribute("MS:1002476|ion mobility drift time", float(descr['IonMobility']))

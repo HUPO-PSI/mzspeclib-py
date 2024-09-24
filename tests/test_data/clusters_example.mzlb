@@ -1,4 +1,5 @@
-<mzSpecLib 1.0>
+<mzSpecLib>
+MS:1003186|library format version=1.0
 <Cluster=1>
 MS:1003320|spectrum cluster size=6
 MS:1003268|spectrum cluster member spectrum keys=1,6,23,63,89

@@ -2,9 +2,14 @@
   "analyte_attribute_sets": {
     "all": []
   },
-  "attributes": [],
+  "attributes": [
+    {
+      "accession": "MS:1003186",
+      "name": "library format version",
+      "value": "1.0"
+    }
+  ],
   "clusters": [],
-  "format_version": "1.0",
   "interpretation_attribute_sets": {
     "all": []
   },

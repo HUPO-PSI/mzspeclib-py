@@ -1,4 +1,5 @@
-<mzSpecLib 1.0>
+<mzSpecLib>
+MS:1003186|library format version=1.0
 MS:1003188|library name=tests/test_data/chinese_hamster_hcd_selected_head.msp
 <AttributeSet Spectrum=all>
 <AttributeSet Analyte=all>

@@ -1,3 +1,5 @@
+<mzSpecLib>
+MS:1003186|library format version=1.0
 <Spectrum=1>
 MS:1003061|library spectrum name=Test
 MS:1000744|selected ion m/z=880.8902

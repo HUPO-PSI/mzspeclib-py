@@ -9,7 +9,9 @@ from mzspeclib.attributes import (
     AttributeProxy as _AttributeProxy, AttributeFacet
 )
 from mzspeclib.analyte import Analyte, InterpretationCollection, Interpretation
-from .const import (SPECTRUM_NAME, LIBRARY_SPECTRUM_INDEX, LIBRARY_SPECTRUM_KEY, PRECURSOR_MZ, CHARGE_STATE)
+from .const import (SPECTRUM_NAME, LIBRARY_SPECTRUM_INDEX, LIBRARY_SPECTRUM_KEY, PRECURSOR_MZ, CHARGE_STATE,
+                    SPECTRUM_AGGREGATION_TYPE, NUMBER_OF_REPLICATE_SPECTRA_USED, NUMBER_OF_REPLICATE_SPECTRA_AVAILABLE,
+                    THEORETICAL_MZ, PEAK_ATTRIBUTE)
 
 if TYPE_CHECKING:
     from mzspeclib.spectrum_library import SpectrumLibrary
@@ -18,9 +20,9 @@ if TYPE_CHECKING:
 
 
 class SpectrumAggregation(_AttributeProxy):
-    aggregation_type = AttributeManagedProperty("MS:1003065|spectrum aggregation type")
-    replicates_used = AttributeManagedProperty[int]("MS:1003070|number of replicate spectra used")
-    replicates_available = AttributeManagedProperty[int]("MS:1003069|number of replicate spectra available")
+    aggregation_type = AttributeManagedProperty(SPECTRUM_AGGREGATION_TYPE)
+    replicates_used = AttributeManagedProperty[int](NUMBER_OF_REPLICATE_SPECTRA_USED)
+    replicates_available = AttributeManagedProperty[int](NUMBER_OF_REPLICATE_SPECTRA_AVAILABLE)
 
 
 class Spectrum(AttributeManager):
@@ -82,12 +84,12 @@ class Spectrum(AttributeManager):
 
     precursor_mz = AttributeListManagedProperty[float](
         [PRECURSOR_MZ,
-         "MS:1003053|theoretical monoisotopic m/z"])
+         THEORETICAL_MZ])
 
     _precursor_charge = AttributeManagedProperty[int](CHARGE_STATE)
 
     spectrum_aggregation = AttributeFacet[SpectrumAggregation](SpectrumAggregation)
-    peak_aggregations = AttributeManagedProperty("MS:1003254|peak attribute", multiple=True)
+    peak_aggregations = AttributeManagedProperty(PEAK_ATTRIBUTE, multiple=True)
 
     @property
     def precursor_charge(self) -> int:

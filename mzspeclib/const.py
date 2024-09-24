@@ -24,3 +24,8 @@ SPECTRUM_NAME = "MS:1003061|library spectrum name"
 LIBRARY_SPECTRUM_KEY = "MS:1003237|library spectrum key"
 LIBRARY_SPECTRUM_INDEX = "MS:1003062|library spectrum index"
 PRECURSOR_MZ = "MS:1003208|experimental precursor monoisotopic m/z"
+THEORETICAL_MZ = "MS:1003053|theoretical monoisotopic m/z"
+
+SPECTRUM_AGGREGATION_TYPE = "MS:1003065|spectrum aggregation type"
+NUMBER_OF_REPLICATE_SPECTRA_USED = "MS:1003070|number of replicate spectra used"
+NUMBER_OF_REPLICATE_SPECTRA_AVAILABLE = "MS:1003069|number of replicate spectra available"

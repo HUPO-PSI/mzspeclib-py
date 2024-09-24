@@ -16,10 +16,21 @@ from psims.controlled_vocabulary.controlled_vocabulary import (
 from mzspeclib.cluster import SpectrumCluster
 
 from mzspeclib.index import MemoryIndex, SQLIndex, IndexBase
-from mzspeclib.spectrum import LIBRARY_SPECTRUM_INDEX, LIBRARY_SPECTRUM_KEY, Spectrum
-from mzspeclib.analyte import Analyte, Interpretation, InterpretationMember, ANALYTE_MIXTURE_TERM
+from mzspeclib.spectrum import Spectrum
+from mzspeclib.analyte import Analyte, Interpretation, InterpretationMember
 from mzspeclib.attributes import Attributed, AttributedEntity, AttributeSet, AttributeManagedProperty
 from mzspeclib.ontology import _VocabularyResolverMixin
+from mzspeclib.const import (
+    FORMAT_VERSION_TERM,
+    LIBRARY_NAME_TERM,
+    LIBRARY_IDENTIFIER_TERM,
+    LIBRARY_VERSION_TERM,
+    LIBRARY_URI_TERM,
+    LIBRARY_DESCRIPTION_TERM,
+    ANALYTE_MIXTURE_TERM,
+    LIBRARY_SPECTRUM_INDEX,
+    LIBRARY_SPECTRUM_KEY
+)
 
 from .utils import open_stream, _LineBuffer
 
@@ -30,14 +41,6 @@ logger = logging.getLogger(__name__.rsplit(".", 1)[0])
 logger.addHandler(logging.NullHandler())
 
 ANALYTE_MIXTURE_CURIE = ANALYTE_MIXTURE_TERM.split("|")[0]
-
-FORMAT_VERSION_TERM = 'MS:1003186|library format version'
-LIBRARY_NAME_TERM = "MS:1003188|library name"
-LIBRARY_VERSION_TERM = "MS:1003190|library version"
-LIBRARY_IDENTIFIER_TERM = "MS:1003187|library identifier"
-LIBRARY_DESCRIPTION_TERM = "MS:1003189|library description"
-LIBRARY_URI_TERM = "MS:1003191|library URI"
-
 
 DEFAULT_VERSION = '1.0'
 

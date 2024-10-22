@@ -95,7 +95,7 @@ class Spectrum(AttributeManager):
     def precursor_charge(self) -> int:
         """Obtain the spectrum's precursor ion charge or analyte charge"""
         if self._precursor_charge:
-            self._precursor_charge
+            return self._precursor_charge
         for analyte in self.analytes.values():
             if analyte.charge:
                 return analyte.charge

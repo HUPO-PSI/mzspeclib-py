@@ -18,13 +18,11 @@ from mzspeclib.analyte import FIRST_ANALYTE_KEY, FIRST_INTERPRETATION_KEY, Analy
 from mzspeclib.spectrum import Spectrum, SPECTRUM_NAME, CHARGE_STATE
 from mzspeclib.attributes import AttributeManager, Attributed, Attribute
 
-from mzspeclib.backends.base import SpectralLibraryBackendBase, FORMAT_VERSION_TERM, DEFAULT_VERSION
+from mzspeclib.backends.base import SpectralLibraryBackendBase, FORMAT_VERSION, DEFAULT_VERSION
 
 from mzspeclib.index.base import IndexBase
-
-
-DECOY_SPECTRUM = "MS:1003192|decoy spectrum"
-DECOY_PEPTIDE_SPECTRUM = "MS:1003195|unnatural peptidoform decoy spectrum"
+from mzspeclib import const as c
+from mzspeclib.const import CHARGE_STATE, DECOY_SPECTRUM, DECOY_PEPTIDE_SPECTRUM, PROFORMA_ION, STRIPPED_PEPTIDE_SEQ, LIBRARY_CREATION_SW
 
 
 def _decode_peaks(record: sqlite3.Row):
@@ -96,8 +94,8 @@ class EncyclopediaSpectralLibrary(SpectralLibraryBackendBase):
 
     def read_header(self) -> bool:
         attribs = AttributeManager()
-        attribs.add_attribute(FORMAT_VERSION_TERM, DEFAULT_VERSION)
-        attribs.add_attribute("MS:1003207|library creation software", "EncyclopeDIA")
+        attribs.add_attribute(FORMAT_VERSION, DEFAULT_VERSION)
+        attribs.add_attribute(LIBRARY_CREATION_SW, "EncyclopeDIA")
         self.attributes = attribs
         return True
 
@@ -109,10 +107,10 @@ class EncyclopediaSpectralLibrary(SpectralLibraryBackendBase):
         EncyclopeDIA only stores modifications as delta masses.
         """
         peptide = proforma.ProForma.parse(row['PeptideModSeq'])
-        analyte.add_attribute("MS:1003169|proforma peptidoform sequence", str(peptide))
-        analyte.add_attribute("MS:1001117|theoretical mass", peptide.mass)
-        analyte.add_attribute("MS:1000888|stripped peptide sequence", row['PeptideSeq'])
-        analyte.add_attribute(CHARGE_STATE, row['PrecursorCharge'])
+        peptide.charge_state = row['PrecursorCharge']
+        analyte.add_attribute(PROFORMA_ION, str(peptide))
+        analyte.add_attribute(c.THEORETICAL_MASS, peptide.mass)
+        analyte.add_attribute(STRIPPED_PEPTIDE_SEQ, row['PeptideSeq'])
 
         cursor = self.connection.execute(
             "SELECT ProteinAccession, isDecoy FROM peptidetoprotein WHERE PeptideSeq = ?;", (row['PeptideSeq'], ))
@@ -146,14 +144,15 @@ class EncyclopediaSpectralLibrary(SpectralLibraryBackendBase):
         spectrum.key = info['rowid']
         spectrum.index = info['rowid'] - 1
         spectrum.precursor_mz = info['PrecursorMz']
+        spectrum.add_attribute(CHARGE_STATE, row["PrecursorCharge"])
         try:
-            spectrum.add_attribute("MS:1000894|retention time", info['RTInSeconds'] / 60.0)
+            spectrum.add_attribute(c.RETENTION_TIME, info['RTInSeconds'] / 60.0)
         except KeyError:
             pass
 
         try:
             spectrum.add_attribute(
-                "MS:1003203|constituent spectrum file",
+                c.SOURCE_FILE,
                 f"file://{info['SourceFile']}"
             )
         except KeyError:
@@ -173,7 +172,7 @@ class EncyclopediaSpectralLibrary(SpectralLibraryBackendBase):
 
         mz_array, intensity_array = _decode_peaks(info)
         n_peaks = len(mz_array)
-        spectrum.add_attribute("MS:1003059|number of peaks", n_peaks)
+        spectrum.add_attribute(c.NUM_PEAKS, n_peaks)
 
         peak_list = []
         # EncyclopeDIA does not encode product ion identities

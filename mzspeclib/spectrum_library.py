@@ -4,7 +4,7 @@ import pathlib
 
 from typing import Any, Iterator, Optional, Set, Type, List, Union
 from mzspeclib.attributes import Attribute, AttributeManagedProperty, AttributeManager
-from mzspeclib.backends.base import LIBRARY_DESCRIPTION_TERM, LIBRARY_NAME_TERM, LIBRARY_URI_TERM, LIBRARY_VERSION_TERM
+from mzspeclib.backends.base import LIBRARY_DESCRIPTION, LIBRARY_NAME, LIBRARY_URI, LIBRARY_VERSION
 from mzspeclib.cluster import SpectrumCluster
 
 from mzspeclib.spectrum_library_index import SpectrumLibraryIndex
@@ -56,10 +56,10 @@ class SpectrumLibrary:
     format: str
     index_type: Type[IndexBase]
 
-    name = AttributeManagedProperty[str](LIBRARY_NAME_TERM)
-    description = AttributeManagedProperty[str](LIBRARY_DESCRIPTION_TERM)
-    uri = AttributeManagedProperty[str](LIBRARY_URI_TERM)
-    library_version = AttributeManagedProperty[str](LIBRARY_VERSION_TERM)
+    name = AttributeManagedProperty[str](LIBRARY_NAME)
+    description = AttributeManagedProperty[str](LIBRARY_DESCRIPTION)
+    uri = AttributeManagedProperty[str](LIBRARY_URI)
+    library_version = AttributeManagedProperty[str](LIBRARY_VERSION)
 
     _identifier = None
     _filename = None

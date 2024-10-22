@@ -21,13 +21,13 @@ from mzspeclib.analyte import Analyte, Interpretation, InterpretationMember
 from mzspeclib.attributes import Attributed, AttributedEntity, AttributeSet, AttributeManagedProperty
 from mzspeclib.ontology import _VocabularyResolverMixin
 from mzspeclib.const import (
-    FORMAT_VERSION_TERM,
-    LIBRARY_NAME_TERM,
-    LIBRARY_IDENTIFIER_TERM,
-    LIBRARY_VERSION_TERM,
-    LIBRARY_URI_TERM,
-    LIBRARY_DESCRIPTION_TERM,
-    ANALYTE_MIXTURE_TERM,
+    FORMAT_VERSION,
+    LIBRARY_NAME,
+    LIBRARY_IDENTIFIER,
+    LIBRARY_VERSION,
+    LIBRARY_URI,
+    LIBRARY_DESCRIPTION,
+    ANALYTE_MIXTURE,
     LIBRARY_SPECTRUM_INDEX,
     LIBRARY_SPECTRUM_KEY
 )
@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__.rsplit(".", 1)[0])
 logger.addHandler(logging.NullHandler())
 
-ANALYTE_MIXTURE_CURIE = ANALYTE_MIXTURE_TERM.split("|")[0]
+ANALYTE_MIXTURE_CURIE = ANALYTE_MIXTURE.split("|")[0]
 
 DEFAULT_VERSION = '1.0'
 
@@ -98,20 +98,20 @@ class SubclassRegisteringMetaclass(type):
 
 class _LibraryViewMixin:
 
-    name = AttributeManagedProperty[str](LIBRARY_NAME_TERM)
-    identifier = AttributeManagedProperty[str](LIBRARY_IDENTIFIER_TERM)
-    description = AttributeManagedProperty[str](LIBRARY_DESCRIPTION_TERM)
-    uri = AttributeManagedProperty[str](LIBRARY_URI_TERM)
-    library_version = AttributeManagedProperty[str](LIBRARY_VERSION_TERM)
+    name = AttributeManagedProperty[str](LIBRARY_NAME)
+    identifier = AttributeManagedProperty[str](LIBRARY_IDENTIFIER)
+    description = AttributeManagedProperty[str](LIBRARY_DESCRIPTION)
+    uri = AttributeManagedProperty[str](LIBRARY_URI)
+    library_version = AttributeManagedProperty[str](LIBRARY_VERSION)
 
     @property
     def format_version(self):
         try:
-            value = self.get_attribute(FORMAT_VERSION_TERM)
+            value = self.get_attribute(FORMAT_VERSION)
             return value
         except KeyError:
             value = DEFAULT_VERSION
-            self.add_attribute(FORMAT_VERSION_TERM, value)
+            self.add_attribute(FORMAT_VERSION, value)
             return value
 
 
@@ -281,9 +281,9 @@ class SpectralLibraryBackendBase(AttributedEntity, _VocabularyResolverMixin, _Li
 
     def _analyte_interpretation_link(self, spectrum: Spectrum,
                                      interpretation: Interpretation):
-        if (interpretation.has_attribute(ANALYTE_MIXTURE_TERM) and
+        if (interpretation.has_attribute(ANALYTE_MIXTURE) and
             not interpretation.analytes):
-            analyte_ids = interpretation.get_attribute(ANALYTE_MIXTURE_TERM)
+            analyte_ids = interpretation.get_attribute(ANALYTE_MIXTURE)
             if isinstance(analyte_ids, str):
                 term = self.find_term_for(ANALYTE_MIXTURE_CURIE)
                 analyte_ids = term.value_type(analyte_ids)
@@ -699,7 +699,7 @@ class SpectralLibraryWriterBase(_VocabularyResolverMixin, metaclass=SubclassRegi
     def _not_analyte_mixture_term(self, attrib):
         if attrib:
             key = attrib[0]
-            if key == ANALYTE_MIXTURE_TERM:
+            if key == ANALYTE_MIXTURE:
                 return False
         return True
 

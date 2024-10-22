@@ -13,7 +13,7 @@ from mzspeclib.annotation import AnnotationStringParser
 from mzspeclib.spectrum import Spectrum
 
 from .utils import open_stream, CaseInsensitiveDict, try_cast
-from .base import DEFAULT_VERSION, FORMAT_VERSION_TERM, LIBRARY_NAME_TERM
+from .base import DEFAULT_VERSION, FORMAT_VERSION, LIBRARY_NAME
 from .msp import (
     DispatchingAttributeHandler,
     MSPSpectralLibrary as _MSPSpectralLibrary,
@@ -409,7 +409,7 @@ class SPTXTSpectralLibrary(_MSPSpectralLibrary):
     def _parse_header_from_stream(self, stream: io.RawIOBase) -> Tuple[bool, int]:
         nbytes = 0
         attributes = AttributeManager()
-        attributes.add_attribute(FORMAT_VERSION_TERM, DEFAULT_VERSION)
+        attributes.add_attribute(FORMAT_VERSION, DEFAULT_VERSION)
 
         line = stream.readline()
         nbytes += len(line)
@@ -422,10 +422,10 @@ class SPTXTSpectralLibrary(_MSPSpectralLibrary):
             i += 1
 
         self._parse_header_into_attributes(header_buffer, attributes)
-        if not attributes.has_attribute(LIBRARY_NAME_TERM):
+        if not attributes.has_attribute(LIBRARY_NAME):
             name = self._infer_lib_name()
             if name:
-                attributes.add_attribute(LIBRARY_NAME_TERM, name)
+                attributes.add_attribute(LIBRARY_NAME, name)
 
         self.attributes.clear()
         self.attributes._from_iterable(attributes)
@@ -440,7 +440,7 @@ class SPTXTSpectralLibrary(_MSPSpectralLibrary):
             if line.startswith(b"###"):
                 if i == 0:
                     name = line.rsplit(b'(', 1)[0].strip().decode('utf8').strip("# ")
-                    attributes.add_attribute(LIBRARY_NAME_TERM, name)
+                    attributes.add_attribute(LIBRARY_NAME, name)
                 elif i == 1:
                     version = line.split(b"(", 1)[1].strip().decode("utf8").split(",")[0].split(" ")[1]
                     gid = attributes.get_next_group_identifier()

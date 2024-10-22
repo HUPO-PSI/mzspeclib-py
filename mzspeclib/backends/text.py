@@ -23,7 +23,7 @@ from .base import (
     SpectralLibraryBackendBase,
     _PlainTextSpectralLibraryBackendBase,
     SpectralLibraryWriterBase,
-    FORMAT_VERSION_TERM,
+    FORMAT_VERSION,
     AttributeSetTypes,
 )
 from .utils import try_cast, open_stream
@@ -529,12 +529,12 @@ class TextSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
                         if state == _LibraryParserStateEnum.attribute_sets:
                             current_attribute_set.add_attribute(d["term"], d["value"])
                         else:  # Otherwise store it in the library level attributes
-                            if d["term"] == FORMAT_VERSION_TERM: # Don't add the format version attribute multiple times
-                                if attributes.has_attribute(FORMAT_VERSION_TERM):
+                            if d["term"] == FORMAT_VERSION: # Don't add the format version attribute multiple times
+                                if attributes.has_attribute(FORMAT_VERSION):
                                     logger.debug(
                                         "Encountered extra format version term with value %r, current value is %r, skipping",
                                         d["value"],
-                                        attributes.get_attribute(FORMAT_VERSION_TERM),
+                                        attributes.get_attribute(FORMAT_VERSION),
                                     )
                                 else:
                                     attributes.add_attribute(d["term"], d["value"])
@@ -581,9 +581,9 @@ class TextSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
                 self._add_attribute_set(
                     current_attribute_set, current_attribute_set_type
                 )
-            if not attributes.has_attribute(FORMAT_VERSION_TERM):
-                warnings.warn(f"Library does not have a {FORMAT_VERSION_TERM}, assuming current version", category=ValidationWarning)
-                attributes = [Attribute(FORMAT_VERSION_TERM, DEFAULT_VERSION)] + list(attributes)
+            if not attributes.has_attribute(FORMAT_VERSION):
+                warnings.warn(f"Library does not have a {FORMAT_VERSION}, assuming current version", category=ValidationWarning)
+                attributes = [Attribute(FORMAT_VERSION, DEFAULT_VERSION)] + list(attributes)
             self.attributes.clear()
             self.attributes._from_iterable(attributes)
             return True, nbytes

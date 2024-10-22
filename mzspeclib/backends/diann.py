@@ -11,23 +11,26 @@ from typing import List, Optional, Tuple, Dict, Iterator, Any, Union
 from pyteomics import proforma
 
 from mzspeclib import annotation
-from mzspeclib.backends.base import DEFAULT_VERSION, FORMAT_VERSION_TERM, LIBRARY_NAME_TERM, _CSVSpectralLibraryBackendBase
+from mzspeclib.backends.base import DEFAULT_VERSION, FORMAT_VERSION, LIBRARY_NAME, _CSVSpectralLibraryBackendBase
 from mzspeclib.backends.utils import open_stream, urlify
 from mzspeclib.spectrum import Spectrum, SPECTRUM_NAME
+from mzspeclib.const import (
+    PROFORMA_SEQ as PROFORMA_PEPTIDE_TERM,
+    PROFORMA_ION,
+    STRIPPED_PEPTIDE_SEQ as STRIPPED_PEPTIDE_TERM,
+    SELECTED_ION_MZ as SPECTRUM_SELECTED_ION_MZ,
+    CHARGE_STATE,
+    SOURCE_FILE,
+    CUSTOM_ATTRIBUTE_NAME,
+    CUSTOM_ATTRIBUTE_VALUE
+)
 
 
 def _rewrite_unimod_peptide_as_proforma(sequence: str) -> str:
     return sequence.replace("(", '[').replace(')', ']').replace("UniMod", "UNIMOD")
 
 
-CHARGE_STATE = "MS:1000041|charge state"
-SELECTED_ION_MZ = "MS:1003053|theoretical monoisotopic m/z"
-SOURCE_FILE = "MS:1003203|constituent spectrum file"
-STRIPPED_PEPTIDE_TERM = "MS:1000888|stripped peptide sequence"
-PROFORMA_PEPTIDE_TERM = "MS:1003169|proforma peptidoform sequence"
-
-CUSTOM_ATTRIBUTE_NAME = "MS:1003275|other attribute name"
-CUSTOM_ATTRIBUTE_VALUE = "MS:1003276|other attribute value"
+THEO_SELECTED_ION_MZ = "MS:1003053|theoretical monoisotopic m/z"
 
 NO_LOSS = 'noloss'
 
@@ -79,12 +82,12 @@ class DIANNTSVSpectralLibrary(_CSVSpectralLibraryBackendBase):
 
     def read_header(self) -> bool:
         result = super().read_header()
-        self.add_attribute(FORMAT_VERSION_TERM, DEFAULT_VERSION)
+        self.add_attribute(FORMAT_VERSION, DEFAULT_VERSION)
         if hasattr(self.filename, 'name'):
             name = self.filename.name.replace(".gz", '').rsplit('.', 1)[0].split(os.sep)[-1]
         else:
             name = self.filename.replace(".gz", '').rsplit(".", 1)[0].split(os.sep)[-1]
-        self.add_attribute(LIBRARY_NAME_TERM, name)
+        self.add_attribute(LIBRARY_NAME, name)
         self.add_attribute("MS:1003207|library creation software", "MS:1003253|DIA-NN")
         return result
 
@@ -141,7 +144,7 @@ class DIANNTSVSpectralLibrary(_CSVSpectralLibraryBackendBase):
         descr = buffer[0]
 
         spec.add_attribute(SPECTRUM_NAME, descr['transition_group_id'])
-        spec.add_attribute(SELECTED_ION_MZ, float(descr['PrecursorMz']))
+        spec.add_attribute(SPECTRUM_SELECTED_ION_MZ, float(descr['PrecursorMz']))
 
         if 'FileName' in descr:
             spec.add_attribute(SOURCE_FILE, urlify(descr['FileName']))
@@ -163,9 +166,10 @@ class DIANNTSVSpectralLibrary(_CSVSpectralLibraryBackendBase):
 
         if 'PeptideSequence' in descr:
             analyte.add_attribute(STRIPPED_PEPTIDE_TERM, descr['PeptideSequence'])
-        analyte.add_attribute(PROFORMA_PEPTIDE_TERM, pf_seq)
+        peptide.charge_state = descr['PrecursorCharge']
+        analyte.add_attribute(PROFORMA_ION, str(peptide))
         analyte.add_attribute("MS:1001117|theoretical mass", peptide.mass)
-        analyte.add_attribute(CHARGE_STATE, int(descr['PrecursorCharge']))
+        spec.add_attribute(CHARGE_STATE, int(descr['PrecursorCharge']))
 
         protein_group_id = analyte.get_next_group_identifier()
         if "UniprotID" in descr:

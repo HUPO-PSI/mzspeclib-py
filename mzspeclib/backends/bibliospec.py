@@ -17,8 +17,23 @@ from mzspeclib import annotation
 from mzspeclib.analyte import FIRST_ANALYTE_KEY, FIRST_INTERPRETATION_KEY, Analyte
 from mzspeclib.spectrum import Spectrum, SPECTRUM_NAME, CHARGE_STATE
 from mzspeclib.attributes import AttributeManager, Attributed
+from mzspeclib.const import (
+    CHARGE_STATE,
+    LIBRARY_IDENTIFIER,
+    PROFORMA_ION,
+    LIBRARY_NAME,
+    SCAN_NUMBER,
+    SOURCE_FILE,
+    STRIPPED_PEPTIDE_SEQ,
+    RETENTION_TIME,
+    SW_VERSION,
+    THEORETICAL_MASS,
+    NUMBER_OF_REPLICATE_SPECTRA_AVAILABLE,
+    NUMBER_OF_REPLICATE_SPECTRA_USED,
+    LIBRARY_CREATION_SW,
+)
 
-from mzspeclib.backends.base import SpectralLibraryBackendBase, FORMAT_VERSION_TERM, DEFAULT_VERSION
+from mzspeclib.backends.base import SpectralLibraryBackendBase, FORMAT_VERSION, DEFAULT_VERSION
 
 from mzspeclib.index.base import IndexBase
 
@@ -110,16 +125,16 @@ class BibliospecSpectralLibrary(BibliospecBase, SpectralLibraryBackendBase):
 
     def read_header(self) -> bool:
         attribs = AttributeManager()
-        attribs.add_attribute(FORMAT_VERSION_TERM, DEFAULT_VERSION)
-        attribs.add_attribute("MS:1003207|library creation software", "Bibliospec")
+        attribs.add_attribute(FORMAT_VERSION, DEFAULT_VERSION)
+        attribs.add_attribute(LIBRARY_CREATION_SW, "Bibliospec")
 
         info = self.connection.execute("SELECT * FROM LibInfo;").fetchone()
         library_id = info['libLSID']
         _, pfx_name = library_id.split("bibliospec:")
         _, name = pfx_name.split(":", 1)
-        attribs.add_attribute("MS:1003188|library name", name)
-        attribs.add_attribute("MS:1003187|library identifier", library_id)
-        attribs.add_attribute("MS:1003200|software version", f"{info['majorVersion']}.{info['minorVersion']}")
+        attribs.add_attribute(LIBRARY_NAME, name)
+        attribs.add_attribute(LIBRARY_IDENTIFIER, library_id)
+        attribs.add_attribute(SW_VERSION, f"{info['majorVersion']}.{info['minorVersion']}")
         self.attributes = attribs
         return True
 
@@ -131,10 +146,10 @@ class BibliospecSpectralLibrary(BibliospecBase, SpectralLibraryBackendBase):
         Bibliospec only stores modifications as delta masses.
         """
         peptide = self._correct_modifications_in_sequence(row)
-        analyte.add_attribute("MS:1003169|proforma peptidoform sequence", str(peptide))
-        analyte.add_attribute("MS:1001117|theoretical mass", peptide.mass)
-        analyte.add_attribute("MS:1000888|stripped peptide sequence", row['peptideSeq'])
-        analyte.add_attribute(CHARGE_STATE, row['precursorCharge'])
+        peptide.charge_state = row['precursorCharge']
+        analyte.add_attribute(PROFORMA_ION, str(peptide))
+        analyte.add_attribute(THEORETICAL_MASS, peptide.mass)
+        analyte.add_attribute(STRIPPED_PEPTIDE_SEQ, row['peptideSeq'])
 
     def get_spectrum(self, spectrum_number: int = None, spectrum_name: str = None):
         """
@@ -156,13 +171,13 @@ class BibliospecSpectralLibrary(BibliospecBase, SpectralLibraryBackendBase):
         spectrum.precursor_mz = info['precursorMZ']
         spectrum.add_attribute(CHARGE_STATE, info['precursorCharge'])
         try:
-            spectrum.add_attribute("MS:1000894|retention time", info['retentionTime'])
+            spectrum.add_attribute(RETENTION_TIME, info['retentionTime'])
         except KeyError:
             pass
 
         try:
-            spectrum.add_attribute("MS:1003069|number of replicate spectra available", info['copies'])
-            spectrum.add_attribute("MS:1003070|number of replicate spectra used", 1)
+            spectrum.add_attribute(NUMBER_OF_REPLICATE_SPECTRA_AVAILABLE, info['copies'])
+            spectrum.add_attribute(NUMBER_OF_REPLICATE_SPECTRA_USED, 1)
         except KeyError:
             pass
 
@@ -171,14 +186,14 @@ class BibliospecSpectralLibrary(BibliospecBase, SpectralLibraryBackendBase):
 
         try:
             spectrum.add_attribute(
-                "MS:1003203|constituent spectrum file",
+                SOURCE_FILE,
                 self.connection.execute("SELECT fileName FROM SpectrumSourceFiles WHERE id = ?",
                                         (info['fileID'], )).fetchone()['fileName']
             )
         except KeyError:
             pass
         spectrum.add_attribute(
-            "MS:1003057|scan number",
+            SCAN_NUMBER,
             info["SpecIDinFile"]
         )
 

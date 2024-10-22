@@ -5,7 +5,7 @@ from typing import Iterable, KeysView, ItemsView, Optional, ValuesView, Dict, Mu
 from pyteomics import proforma
 
 from mzspeclib.attributes import AttributedEntity, IdentifiedAttributeManager, AttributeManagedProperty, AttributeProxy, AttributeGroupFacet
-from mzspeclib.const import (ANALYTE_MIXTURE_TERM, CHARGE_STATE, PROFORMA_ION, PROFORMA_SEQ, STRIPPED_PEPTIDE_SEQ, FIRST_ANALYTE_KEY, FIRST_INTERPRETATION_KEY)
+from mzspeclib.const import (ANALYTE_MIXTURE, CHARGE_STATE, PROFORMA_ION, PROFORMA_SEQ, STRIPPED_PEPTIDE_SEQ, FIRST_ANALYTE_KEY, FIRST_INTERPRETATION_KEY)
 
 
 class _AnalyteMappingProxy(Mapping[str, 'Analyte']):
@@ -132,7 +132,7 @@ class Interpretation(AttributedEntity, MutableMapping):
 
     def _update_mixture_members_term(self):
         value = sorted(map(int, self.analytes.keys()))
-        self.replace_attribute(ANALYTE_MIXTURE_TERM, value)
+        self.replace_attribute(ANALYTE_MIXTURE, value)
 
     def get_analyte(self, analyte_id) -> 'Analyte':
         """Retrieve an analyte by its identifier"""

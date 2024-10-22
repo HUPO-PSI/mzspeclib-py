@@ -9,19 +9,21 @@ from pyteomics import proforma
 
 from mzspeclib import annotation
 from mzspeclib.analyte import Analyte
-from mzspeclib.backends.base import LIBRARY_NAME_TERM, _CSVSpectralLibraryBackendBase, FORMAT_VERSION_TERM, DEFAULT_VERSION
+from mzspeclib.backends.base import LIBRARY_NAME, _CSVSpectralLibraryBackendBase, FORMAT_VERSION, DEFAULT_VERSION
 from mzspeclib.backends.utils import open_stream, urlify, try_cast
 from mzspeclib.spectrum import Spectrum, SPECTRUM_NAME
+from mzspeclib import const as c
+from mzspeclib.const import (
+    CHARGE_STATE,
+    SOURCE_FILE,
+    STRIPPED_PEPTIDE_SEQ as STRIPPED_PEPTIDE_TERM,
+    PROFORMA_SEQ as PROFORMA_PEPTIDE_TERM,
+    CUSTOM_ATTRIBUTE_NAME,
+    CUSTOM_ATTRIBUTE_VALUE,
+)
 
 
-CHARGE_STATE = "MS:1000041|charge state"
 SELECTED_ION_MZ = "MS:1003208|experimental precursor monoisotopic m/z"
-SOURCE_FILE = "MS:1003203|constituent spectrum file"
-STRIPPED_PEPTIDE_TERM = "MS:1000888|stripped peptide sequence"
-PROFORMA_PEPTIDE_TERM = "MS:1003169|proforma peptidoform sequence"
-
-CUSTOM_ATTRIBUTE_NAME = "MS:1003275|other attribute name"
-CUSTOM_ATTRIBUTE_VALUE = "MS:1003276|other attribute value"
 
 ID_SEP = "/"
 _ID_SEP = ID_SEP.encode("ascii")
@@ -104,24 +106,24 @@ class SpectronautTSVSpectralLibrary(_CSVSpectralLibraryBackendBase):
         super().__init__(filename, index_type=index_type, delimiter='\t', **kwargs)
 
     def _spectrum_origin_type(self):
-        key = "MS:1003072|spectrum origin type"
-        value = "MS:1003073|observed spectrum"
+        key = c.SPECTRUM_ORIGIN_TYPE
+        value = c.SELECTED_FRAGMENT_THEORETICAL_OBSERVED_INTENSITY_SPECTRUM
         return key, value
 
     def _spectrum_aggregation_type(self):
-        key = "MS:1003065|spectrum aggregation type"
-        value = "MS:1003067|consensus spectrum"
+        key = c.SPECTRUM_AGGREGATION_TYPE
+        value = c.CONSENSUS_SPECTRUM
         return key, value
 
     def read_header(self) -> bool:
         result = super().read_header()
-        self.add_attribute(FORMAT_VERSION_TERM, DEFAULT_VERSION)
+        self.add_attribute(FORMAT_VERSION, DEFAULT_VERSION)
         if hasattr(self.filename, 'name'):
             name = self.filename.name.replace(".gz", '').rsplit('.', 1)[0].split(os.sep)[-1]
         else:
             name = self.filename.replace(".gz", '').rsplit(".", 1)[0].split(os.sep)[-1]
-        self.add_attribute(LIBRARY_NAME_TERM, name)
-        self.add_attribute("MS:1003207|library creation software", "MS:1001327|Spectronaut")
+        self.add_attribute(LIBRARY_NAME, name)
+        self.add_attribute(c.LIBRARY_CREATION_SW, "MS:1001327|Spectronaut")
         return result
 
     def _batch_rows(self, iterator: Iterator[Dict[str, Any]]) -> Iterator[List[Dict[str, Any]]]:
@@ -219,37 +221,38 @@ class SpectronautTSVSpectralLibrary(_CSVSpectralLibraryBackendBase):
     def _build_analyte(self, description: Dict[str, Any], analyte: Analyte) -> Analyte:
         pf_seq = _rewrite_modified_peptide_as_proforma(description['ModifiedPeptide'])
         peptide = proforma.ProForma.parse(pf_seq)
+        peptide.charge_state = int(description['PrecursorCharge'])
         analyte.add_attribute(STRIPPED_PEPTIDE_TERM, description['StrippedPeptide'])
-        analyte.add_attribute(PROFORMA_PEPTIDE_TERM, pf_seq)
-        analyte.add_attribute("MS:1001117|theoretical mass", peptide.mass)
-        analyte.add_attribute(CHARGE_STATE, int(description['PrecursorCharge']))
+        analyte.add_attribute(c.PROFORMA_ION, str(peptide))
+        analyte.add_attribute(c.THEORETICAL_MASS, peptide.mass)
+
 
         protein_group_id = analyte.get_next_group_identifier()
 
 
         if 'UniProtIds' in description:
             analyte.add_attribute(
-                "MS:1000885|protein accession",
+                c.PROTEIN_ACCESSION,
                 description['UniProtIds'],
                 group_identifier=protein_group_id
             )
         if 'Protein Name' in description:
             analyte.add_attribute(
-                "MS:1000886|protein name",
+                c.PROTEIN_NAME,
                 description["Protein Name"],
                 group_identifier=protein_group_id
             )
         if 'ProteinDescription' in description:
             analyte.add_attribute(
-                "MS:1001088|protein description",
+                c.PROTEIN_DESCRIPTION,
                 description['ProteinDescription'],
                 group_identifier=protein_group_id
             )
 
         if "OrganismId" in description and description["OrganismId"] is not None:
             analyte.add_attribute_group([
-                ["MS:1001467|taxonomy: NCBI TaxID", try_cast(description['OrganismId'])],
-                ["MS:1001469|taxonomy: scientific name", description['Organisms']],
+                [c.TAXONOMY_NCBI_TAX_ID, try_cast(description['OrganismId'])],
+                [c.TAXONOMY_SCIENTIFIC_NAME, description['Organisms']],
             ])
 
         for key in self._custom_analyte_keys:
@@ -269,8 +272,7 @@ class SpectronautTSVSpectralLibrary(_CSVSpectralLibraryBackendBase):
 
         spec.add_attribute(SPECTRUM_NAME, ID_SEP.join(key))
         spec.add_attribute(SELECTED_ION_MZ, float(descr['PrecursorMz']))
-        # Charge does not belong in the spectrum
-        # spec.add_attribute(CHARGE_STATE, int(descr['PrecursorCharge']))
+        spec.add_attribute(CHARGE_STATE, int(descr['PrecursorCharge']))
         spec.add_attribute(SOURCE_FILE, urlify(descr['ReferenceRun']))
         spec.add_attribute(*self._spectrum_origin_type())
         spec.add_attribute(*self._spectrum_aggregation_type())
@@ -288,8 +290,8 @@ class SpectronautTSVSpectralLibrary(_CSVSpectralLibraryBackendBase):
             group_id = spec.get_next_group_identifier()
             spec.add_attribute("MS:1000896|normalized retention time", float(descr['iRT']), group_identifier=group_id)
             spec.add_attribute(
-                "UO:0000000|unit",
-                "UO:0000031|minute",
+                c.UNIT,
+                c.MINUTE,
                 group_identifier=group_id,
             )
 
@@ -305,7 +307,7 @@ class SpectronautTSVSpectralLibrary(_CSVSpectralLibraryBackendBase):
                 ])
 
         spec.peak_list = self._generate_peaks(buffer)
-        spec.add_attribute("MS:1003059|number of peaks", len(spec.peak_list))
+        spec.add_attribute(c.NUM_PEAKS, len(spec.peak_list))
 
         if spectrum_index is not None:
             spec.index = spectrum_index

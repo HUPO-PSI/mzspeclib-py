@@ -4,7 +4,7 @@ import unittest
 
 from mzspeclib.spectrum import Spectrum
 from mzspeclib.backends import (MSPSpectralLibrary, TextSpectralLibrary, JSONSpectralLibrary, SpectronautTSVSpectralLibrary, DIANNTSVSpectralLibrary)
-from mzspeclib.analyte import ANALYTE_MIXTURE_TERM
+from mzspeclib.analyte import ANALYTE_MIXTURE
 
 from .common import datafile
 
@@ -46,7 +46,7 @@ class MzSpecLibLibraryBehaviorBase(LibraryBehaviorBase):
         interp = spec.interpretations[1]
         assert len(interp.attributes) == 2
         assert interp.get_attribute('MS:1002357|PSM-level probability') == 0.974
-        assert interp.get_attribute(ANALYTE_MIXTURE_TERM) == [1, 2]
+        assert interp.get_attribute(ANALYTE_MIXTURE) == [1, 2]
         mem = interp.get_member_interpretation(1)
         assert len(mem) == 1
         assert mem.get_attribute('MS:XXXXXXX|explained intensity fraction') == 0.287
@@ -93,6 +93,6 @@ class TestDIANNTSVLibrary(unittest.TestCase, LibraryBehaviorBase):
 
         spec: Spectrum = lib[0]
         analyte = spec.get_analyte(1)
-        assert analyte.peptide == 'AAAAAAAAAAAAAAAASAGGK'
+        assert analyte.peptide == 'AAAAAAAAAAAAAAAASAGGK/2'
         assert spec.name == 'AAAAAAAAAAAAAAAASAGGK2'
 

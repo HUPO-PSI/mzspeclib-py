@@ -15,12 +15,13 @@ from mzspeclib.annotation import parse_annotation, IonAnnotationBase
 from mzspeclib.analyte import Analyte, Interpretation
 from mzspeclib.spectrum import Spectrum
 from mzspeclib.utils import ValidationWarning
+from mzspeclib.const import ATTRIBUTE_SET_NAME
 
 from .base import (
     DEFAULT_VERSION,
     SpectralLibraryBackendBase,
     SpectralLibraryWriterBase,
-    FORMAT_VERSION_TERM,
+    FORMAT_VERSION,
     AttributeSetTypes,
 )
 from .utils import open_stream
@@ -50,8 +51,7 @@ ANALYTE_CLASSES = "analyte_attribute_sets"
 INTERPRETATION_CLASSES = "interpretation_attribute_sets"
 CLUSTER_CLASSES = "cluster_attribute_sets"
 
-FORMAT_VERSION_ACC = FORMAT_VERSION_TERM.split("|")[0]
-ATTRIBUTE_SET_NAME = "MS:1003212|library attribute set name"
+FORMAT_VERSION_ACC = FORMAT_VERSION.split("|")[0]
 
 
 class JSONSpectralLibrary(SpectralLibraryBackendBase):
@@ -108,12 +108,12 @@ class JSONSpectralLibrary(SpectralLibraryBackendBase):
     def read_header(self) -> bool:
         if self.buffer:
             self._fill_attributes(self.buffer.get(LIBRARY_METADATA_KEY), self.attributes)
-            if not self.attributes.has_attribute(FORMAT_VERSION_TERM):
+            if not self.attributes.has_attribute(FORMAT_VERSION):
                 warnings.warn(
-                    f"Library does not have a {FORMAT_VERSION_TERM}, assuming current version",
+                    f"Library does not have a {FORMAT_VERSION}, assuming current version",
                     category=ValidationWarning,
                 )
-                attributes = [Attribute(FORMAT_VERSION_TERM, DEFAULT_VERSION)] + list(self.attributes)
+                attributes = [Attribute(FORMAT_VERSION, DEFAULT_VERSION)] + list(self.attributes)
                 self.attributes.clear()
                 self.attributes._attributes_from_iterable(attributes)
             self.analyte_attribute_sets.update(self._load_attribute_sets(self.buffer.get(ANALYTE_CLASSES, {})))

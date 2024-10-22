@@ -144,7 +144,7 @@ class EncyclopediaSpectralLibrary(SpectralLibraryBackendBase):
         spectrum.key = info['rowid']
         spectrum.index = info['rowid'] - 1
         spectrum.precursor_mz = info['PrecursorMz']
-        spectrum.add_attribute(CHARGE_STATE, row["PrecursorCharge"])
+        spectrum.add_attribute(CHARGE_STATE, info["PrecursorCharge"])
         try:
             spectrum.add_attribute(c.RETENTION_TIME, info['RTInSeconds'] / 60.0)
         except KeyError:

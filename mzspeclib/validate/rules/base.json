@@ -168,6 +168,12 @@
           "allow_children": false,
           "name": "possible charge state",
           "repeatable": false
+        },
+        {
+          "accession": "MS:1003270",
+          "allow_children": false,
+          "name": "proforma peptidoform ion notation",
+          "repeatable": false
         }
       ],
       "combination_logic": "OR",

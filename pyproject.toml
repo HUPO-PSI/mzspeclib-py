@@ -1,6 +1,6 @@
 [project]
 name='mzspeclib'
-version='0.1.0-alpha'
+version='1.0.1'
 description='HUPO-PSI Spectral library format'
 
 keywords = [

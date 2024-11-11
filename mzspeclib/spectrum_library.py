@@ -13,8 +13,6 @@ from mzspeclib.index import IndexBase
 from mzspeclib.backends import guess_implementation, SpectralLibraryBackendBase, SpectralLibraryWriterBase, FormatInferenceFailure
 
 
-debug = False
-
 class SpectrumLibrary:
     """
     Read, write, and search through a spectrum library.

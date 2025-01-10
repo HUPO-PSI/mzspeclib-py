@@ -51,6 +51,14 @@ docs = [
     "sphinx-autobuild",
 ]
 
+[project.urls]
+
+Homepage = "https://hupo-psi.github.io/mzSpecLib/"
+Repository = "https://github.com/HUPO-PSI/mzspeclib-py.git"
+Documentation = "https://mzspeclib-py.readthedocs.io/en/latest/"
+Issues = "https://github.com/HUPO-PSI/mzspeclib-py/issues"
+
+
 [project.scripts]
 mzspeclib = "mzspeclib.tools.cli:main"
 

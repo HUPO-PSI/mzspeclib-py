@@ -45,7 +45,7 @@ the main entry point into the library:
 from mzspeclib import SpectrumLibrary
 
 # Open a spectrum library
-lib = SpectrumLibrary(filename="examples/fetal_brain_tiny.mzlib.txt")
+lib = SpectrumLibrary(filename="examples/fetal_brain_tiny.mzspeclib.txt")
 print(lib)
 
 # Get the number of spectra in the library
@@ -56,6 +56,17 @@ print(n_spectra)
 spec = lib.get_spectrum(spectrum_number=3)
 print(f"Key={spec.key}; Name={spec.name}; Num Peaks={len(spec.peak_list)}")
 print(spec.get_interpretation('1'))
+
+# Loop over a library and count the number of unique peptide analytes
+unique_analytes = set()
+n_spectra = 0
+for spec in lib:
+    for analyte in spec.analytes.values():
+        unique_analytes.add(str(analyte.peptide))
+    n_spectra += 1
+
+print(f"\n{len(unique_analytes)} unique analytes over {n_spectra} spectra")
+print(unique_analytes)
 ```
 <!-- [[[end]]] -->
 
@@ -121,7 +132,7 @@ Usage: mzspeclib convert [OPTIONS] INPATH OUTPATH
   instead of writing to file, data will instead be sent to STDOUT.
 
 Options:
-  -i, --input-format [bibliospec|blib|dia-nn.tsv|dlib|encyclopedia|json|msp|mzlb.json|mzlb.txt|mzlib.json|mzlib.txt|spectronaut.tsv|sptxt|text]
+  -i, --input-format [bibliospec|blib|dia-nn.tsv|dlib|encyclopedia|json|msp|mzSpecLib.json|mzSpecLib.txt|mzlb.json|mzlb.txt|mzlib.json|mzlib.txt|mzspeclib.json|mzspeclib.txt|spectronaut.tsv|sptxt|text]
                                   The file format of the input file. If
                                   omitted, will attempt to infer
                                   automatically.
@@ -159,7 +170,7 @@ Usage: mzspeclib validate [OPTIONS] INPATH
 
 Options:
   -p, --profile [consensus|single|silver|peptide|gold]
-  -i, --input-format [bibliospec|blib|dia-nn.tsv|dlib|encyclopedia|json|msp|mzlb.json|mzlb.txt|mzlib.json|mzlib.txt|spectronaut.tsv|sptxt|text]
+  -i, --input-format [bibliospec|blib|dia-nn.tsv|dlib|encyclopedia|json|msp|mzSpecLib.json|mzSpecLib.txt|mzlb.json|mzlb.txt|mzlib.json|mzlib.txt|mzspeclib.json|mzspeclib.txt|spectronaut.tsv|sptxt|text]
                                   The file format of the input file. If
                                   omitted, will attempt to infer
                                   automatically.

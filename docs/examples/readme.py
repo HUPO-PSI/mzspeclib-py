@@ -1,7 +1,7 @@
 from mzspeclib import SpectrumLibrary
 
 # Open a spectrum library
-lib = SpectrumLibrary(filename="examples/fetal_brain_tiny.mzlib.txt")
+lib = SpectrumLibrary(filename="examples/fetal_brain_tiny.mzspeclib.txt")
 print(lib)
 
 # Get the number of spectra in the library

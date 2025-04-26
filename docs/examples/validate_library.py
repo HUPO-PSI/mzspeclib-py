@@ -9,7 +9,7 @@ from mzspeclib.validate import *
 logging.basicConfig(level=logging.DEBUG, stream=sys.stderr)
 logger = logging.getLogger()
 
-library = SpectrumLibrary(filename="examples/fetal_brain_tiny.mzlib.txt")
+library = SpectrumLibrary(filename="examples/fetal_brain_tiny.mzspeclib.txt")
 
 chain = load_default_validator()
 chain.validate_library(library)

@@ -10,7 +10,7 @@ from .common import datafile
 class TestSpectrum(unittest.TestCase):
 
     def get_library(self):
-        test_file = datafile("chinese_hamster_hcd_selected_head.mzlb.txt")
+        test_file = datafile("chinese_hamster_hcd_selected_head.mzspeclib.txt")
         return TextSpectralLibrary(test_file)
 
     def get_spectrum(self, index):

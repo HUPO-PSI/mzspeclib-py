@@ -10,7 +10,7 @@ from .common import datafile
 class TestSpectrumCluster(unittest.TestCase):
 
     def get_library(self):
-        test_file = datafile("clusters_example.mzlb")
+        test_file = datafile("clusters_example.mzspeclib.txt")
         return TextSpectralLibrary(test_file)
 
     def test_text_cluster_parsing(self):

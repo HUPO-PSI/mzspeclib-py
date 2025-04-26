@@ -34,6 +34,10 @@ else:
             for entry in lib.index
         ]
     )
+
+    st.markdown("""
+    Select a spectrum by clicking on the row margin
+""")
     entries_table = st.dataframe(
         entries,
         selection_mode='single-row',

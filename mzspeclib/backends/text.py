@@ -453,7 +453,7 @@ class TextSpectralLibrary(_PlainTextSpectralLibraryBackendBase):
     supported.
     """
 
-    file_format: ClassVar[List[str]] = ["mzlb.txt", "mzlib.txt"]
+    file_format: ClassVar[List[str]] = ["mzSpecLib.txt", "mzlb.txt", "mzlib.txt", "mzspeclib.txt"]
     format_name: ClassVar[str] = "text"
 
     @classmethod
@@ -924,7 +924,7 @@ class TextSpectralLibraryWriter(SpectralLibraryWriterBase):
         verbose.
     """
 
-    file_format = "mzlb.txt"
+    file_format: ClassVar[List[str]] = ["mzSpecLib.txt", "mzlb.txt", "mzlib.txt", "mzspeclib.txt"]
     format_name = "text"
     default_version = "1.0"
 

@@ -69,7 +69,7 @@ class JSONSpectralLibrary(SpectralLibraryBackendBase):
         This may lead to large memory overhead when reading large libraries in JSON format.
     """
 
-    file_format = ["mzlb.json", "mzlib.json"]
+    file_format = ["mzSpecLib.json", "mzspeclib.json", "mzlb.json", "mzlib.json"]
     format_name = "json"
 
     def __init__(self, filename, index_type=None, read_metadata=True, create_index=None):
@@ -323,7 +323,7 @@ class JSONSpectralLibraryWriter(SpectralLibraryWriterBase):
         This may lead to large memory overhead when writing large libraries in JSON format.
     """
 
-    file_format = "mzlb.json"
+    file_format = ["mzSpecLib.json", "mzspeclib.json", "mzlb.json", "mzlib.json"]
     format_name = "json"
     default_version = "1.0"
 

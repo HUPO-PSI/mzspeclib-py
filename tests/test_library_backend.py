@@ -53,15 +53,15 @@ class MzSpecLibLibraryBehaviorBase(LibraryBehaviorBase):
 
 
 class TestTextLibrary(unittest.TestCase, MzSpecLibLibraryBehaviorBase):
-    test_file = datafile("chinese_hamster_hcd_selected_head.mzlb.txt")
+    test_file = datafile("chinese_hamster_hcd_selected_head.mzspeclib.txt")
     library_cls = TextSpectralLibrary
-    test_interpretation_file = datafile("complex_interpretations_with_members.mzlb.txt")
+    test_interpretation_file = datafile("complex_interpretations_with_members.mzspeclib.txt")
 
 
 class TestJSONLibrary(unittest.TestCase, MzSpecLibLibraryBehaviorBase):
-    test_file = datafile("chinese_hamster_hcd_selected_head.mzlb.json")
+    test_file = datafile("chinese_hamster_hcd_selected_head.mzspeclib.json")
     library_cls = JSONSpectralLibrary
-    test_interpretation_file = datafile("complex_interpretations_with_members.mzlb.json")
+    test_interpretation_file = datafile("complex_interpretations_with_members.mzspeclib.json")
 
 
 class TestSpectronautLibrary(unittest.TestCase, LibraryBehaviorBase):

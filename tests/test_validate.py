@@ -8,7 +8,7 @@ from .common import datafile
 
 class TestLibrarySemanticValidator(unittest.TestCase):
     def open_library(self):
-        test_file = datafile("chinese_hamster_hcd_selected_head.mzlb.txt")
+        test_file = datafile("chinese_hamster_hcd_selected_head.mzspeclib.txt")
         library = SpectrumLibrary(filename=test_file)
         return library
 
@@ -34,6 +34,6 @@ class TestLibrarySemanticValidator(unittest.TestCase):
         valid = validator.get_validator_for("base") | validator.get_object_validator_for("peak_annotations")
         assert self.validate_library(valid)
 
-        test_file = datafile("bad_peak_annotations.mzlb.txt")
+        test_file = datafile("bad_peak_annotations.mzspeclib.txt")
         library = SpectrumLibrary(filename=test_file)
         assert not valid.validate_library(library)

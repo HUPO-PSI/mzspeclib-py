@@ -75,6 +75,8 @@ class SubclassRegisteringMetaclass(type):
         new_type = type.__new__(mcs, name, parents, attrs)
         if not hasattr(new_type, "_file_extension_to_implementation"):
             new_type._file_extension_to_implementation = dict()
+        if not hasattr(new_type, "_file_format_to_implementation"):
+            new_type._file_format_to_implementation = dict()
 
         file_extension = attrs.get("file_format")
         if file_extension is not None:
@@ -87,8 +89,10 @@ class SubclassRegisteringMetaclass(type):
         format_name = attrs.get("format_name")
         if format_name is not None:
             new_type._file_extension_to_implementation[format_name] = new_type
+            new_type._file_format_to_implementation[format_name] = new_type
         else:
             attrs['format_name'] = file_extension
+            new_type._file_format_to_implementation[file_extension] = new_type
         return new_type
 
     def type_for_format(cls, format_or_extension: str) -> Type:

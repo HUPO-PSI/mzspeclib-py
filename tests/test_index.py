@@ -8,7 +8,7 @@ from mzspeclib.index import MemoryIndex, SQLIndex
 from .common import datafile
 
 class IndexBehaviorBase(object):
-    test_file = datafile("chinese_hamster_hcd_selected_head.mzlb.txt")
+    test_file = datafile("chinese_hamster_hcd_selected_head.mzspeclib.txt")
     index_cls = None
 
     def make_dir(self):

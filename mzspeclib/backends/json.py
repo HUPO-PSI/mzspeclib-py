@@ -520,5 +520,5 @@ def format_spectrum(spectrum: Spectrum, pretty_print=True, **kwargs) -> str:
     buffer = io.StringIO()
     with JSONSpectralLibraryWriter(buffer, pretty_print=pretty_print, **kwargs) as writer:
         writer.write_spectrum(spectrum)
-        writer.flush()
+        writer._flush()
         return buffer.getvalue()

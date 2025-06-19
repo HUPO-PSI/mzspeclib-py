@@ -1,6 +1,6 @@
 [project]
 name='mzspeclib'
-version='1.0.6'
+version='1.0.7'
 description='HUPO-PSI Spectral library format'
 
 keywords = [
@@ -68,6 +68,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages]
 find = {}
+
+[tool.setuptools.package-data]
+"mzspeclib.validate.rules" = ["*.json"]
 
 [tool.ruff]
 target-version = "py38"

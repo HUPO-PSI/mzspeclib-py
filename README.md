@@ -15,7 +15,8 @@ of `mzSpecLib`, as well as readers for the following spectral library formats fo
 - Spectronaut
 
 Once installed, it can be used programmatically by importing the `mzspeclib` Python library, or using
-the `mzspeclib` command line tool to read, write, and manipulate spectral libraries.
+the `mzspeclib` command line tool to read, write, and manipulate spectral libraries. It also powers a web
+application to view spectral libraries at https://mzspeclib-app-viewer-demo.streamlit.app/
 
 ## Development
 
